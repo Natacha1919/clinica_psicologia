@@ -1,0 +1,50 @@
+# Nome do nosso manual de instruções para o GitHub
+name: Deploy Flutter Web to GitHub Pages
+
+# Define quando essa automação deve rodar: toda vez que você atualizar a branch 'main'
+on:
+  push:
+    branches: [ "main" ]
+
+# Permissões necessárias para o robô do GitHub publicar o site
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Tarefas que o robô vai executar
+jobs:
+  # A primeira tarefa é "construir" o app
+  build:
+    runs-on: ubuntu-latest # Usar uma máquina virtual com Ubuntu
+    steps:
+      - name: 1. Baixar o código do seu repositório
+        uses: actions/checkout@v3
+
+      - name: 2. Instalar o Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable' # Usar a versão estável do Flutter
+
+      - name: 3. Baixar as dependências do projeto
+        run: flutter pub get
+
+      - name: 4. Construir a versão web do app
+        # ATENÇÃO: Confirme se o nome do repositório está certo aqui!
+        run: flutter build web --release --base-href /clinica_psicologia/
+
+      - name: 5. Preparar os arquivos para publicação
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./build/web
+
+  # A segunda tarefa é "publicar" o que foi construído
+  deploy:
+    needs: build # Só executa depois que o "build" terminar com sucesso
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }} # URL do site
+    steps:
+      - name: Publicar no GitHub Pages
+        uses: actions/deploy-pages@v2
