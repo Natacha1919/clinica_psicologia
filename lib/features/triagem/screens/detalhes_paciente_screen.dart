@@ -143,7 +143,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> {
                 _buildDetailRow(
                   'Data de Inscrição',
                   widget.paciente.dataHoraEnvio != null
-                      ? DateFormat('dd/MM/yyyy HH:mm').format(widget.paciente.dataHoraEnvio!)
+                      ? DateFormat('dd/MM/yyyy').format(widget.paciente.dataHoraEnvio!)
                       : 'Não informada',
                 ),
                 _buildDetailRow('Termo de Consentimento', widget.paciente.termoConsentimento ?? 'Não informado'),
