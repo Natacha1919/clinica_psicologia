@@ -1,6 +1,9 @@
+// lib/app_scaffold.dart
+
 import 'package:flutter/material.dart';
 import 'features/dashboard/screens/dashboard_metrics_screen.dart';
 import 'features/triagem/screens/triagem_screen.dart';
+import 'features/agendamento/screens/agendamento_screen.dart';
 
 class AppScaffold extends StatefulWidget {
   const AppScaffold({super.key});
@@ -14,9 +17,11 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   final Color _primaryDark = const Color(0xFF122640);
 
+  // CORREÇÃO: Garantindo que a AgendamentoScreen está na lista de páginas
   final List<Widget> _pages = [
-    const DashboardMetricsScreen(),
-    const TriagemScreen(),
+    const DashboardMetricsScreen(), // Índice 0
+    const TriagemScreen(),        // Índice 1
+    const AgendamentoScreen(),      // Índice 2 <-- ESTA LINHA CORRIGE O ERRO
   ];
 
   @override
@@ -48,15 +53,20 @@ class _AppScaffoldState extends State<AppScaffold> {
               ),
             ),
             destinations: const <NavigationRailDestination>[
-              NavigationRailDestination(
+              NavigationRailDestination( // Índice 0
                 icon: Icon(Icons.bar_chart_outlined),
                 selectedIcon: Icon(Icons.bar_chart),
                 label: Text('Dashboard'),
               ),
-              NavigationRailDestination(
+              NavigationRailDestination( // Índice 1
                 icon: Icon(Icons.person_search_outlined),
                 selectedIcon: Icon(Icons.person_search),
-                label: Text('inscritos'),
+                label: Text('Inscritos'),
+              ),
+              NavigationRailDestination( // Índice 2
+                icon: Icon(Icons.calendar_month_outlined),
+                selectedIcon: Icon(Icons.calendar_month),
+                label: Text('Agendar'),
               ),
             ],
           ),
