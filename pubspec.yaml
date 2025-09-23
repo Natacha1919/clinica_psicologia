@@ -31,13 +31,10 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Adicione a linha do Supabase aqui, se não existir
-  supabase_flutter: ^2.5.0 # Verifique a versão mais recente no pub.dev
-
-  # Outros pacotes que você possa ter...
-  cupertino_icons: ^1.0.2
-  intl: ^0.20.2
-  timezone: ^0.10.1
+  supabase_flutter: ^2.5.2 # Ou a versão que você estiver usando
+  syncfusion_flutter_charts: ^26.1.39 # Para o gráfico de barras
+  fl_chart: ^0.68.0 # Para o gráfico de pizza interativo
+  intl: ^0.19.0 # Para formatação de datas
 
 dev_dependencies:
   flutter_test:

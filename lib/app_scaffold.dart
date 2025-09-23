@@ -1,5 +1,3 @@
-// lib/app_scaffold.dart
-
 import 'package:flutter/material.dart';
 import 'features/dashboard/screens/dashboard_metrics_screen.dart';
 import 'features/triagem/screens/triagem_screen.dart';
@@ -14,11 +12,11 @@ class AppScaffold extends StatefulWidget {
 class _AppScaffoldState extends State<AppScaffold> {
   int _selectedIndex = 0;
 
-  // Lista de todas as páginas que nosso app terá
+  final Color _primaryDark = const Color(0xFF122640);
+
   final List<Widget> _pages = [
-    const TriagemScreen(),        // Página de índice 0
-    const DashboardMetricsScreen(), // Página de índice 1
-    // Adicione futuras páginas aqui. Ex: Agendamentos, Pagamentos, etc.
+    const DashboardMetricsScreen(),
+    const TriagemScreen(),
   ];
 
   @override
@@ -26,10 +24,8 @@ class _AppScaffoldState extends State<AppScaffold> {
     return Scaffold(
       body: Row(
         children: [
-          // ===================================
-          //  O MENU LATERAL FIXO E PERMANENTE
-          // ===================================
           NavigationRail(
+            minWidth: 100.0,
             selectedIndex: _selectedIndex,
             onDestinationSelected: (int index) {
               setState(() {
@@ -37,33 +33,35 @@ class _AppScaffoldState extends State<AppScaffold> {
               });
             },
             labelType: NavigationRailLabelType.all,
-            backgroundColor: Theme.of(context).canvasColor,
-            elevation: 2,
-            leading: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20.0),
+            backgroundColor: _primaryDark,
+            elevation: 4,
+            unselectedIconTheme: const IconThemeData(color: Colors.white70),
+            selectedIconTheme: const IconThemeData(color: Colors.white),
+            unselectedLabelTextStyle: const TextStyle(color: Colors.white70),
+            selectedLabelTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            leading: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20.0),
               child: CircleAvatar(
                 radius: 30,
-                child: Icon(Icons.psychology, size: 30), // Ícone representativo
+                backgroundColor: Colors.white,
+                child: Icon(Icons.psychology, size: 30, color: _primaryDark),
               ),
             ),
             destinations: const <NavigationRailDestination>[
-              NavigationRailDestination(
-                icon: Icon(Icons.person_search_outlined),
-                selectedIcon: Icon(Icons.person_search),
-                label: Text('Triagem'),
-              ),
               NavigationRailDestination(
                 icon: Icon(Icons.bar_chart_outlined),
                 selectedIcon: Icon(Icons.bar_chart),
                 label: Text('Dashboard'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.person_search_outlined),
+                selectedIcon: Icon(Icons.person_search),
+                label: Text('inscritos'),
+              ),
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
 
-          // =========================================================
-          //  A ÁREA DE CONTEÚDO QUE MUDA CONFORME O MENU
-          // =========================================================
           Expanded(
             child: _pages[_selectedIndex],
           ),

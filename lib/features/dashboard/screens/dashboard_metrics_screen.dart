@@ -1,147 +1,311 @@
-// lib/features/dashboard/screens/dashboard_metrics_screen.dart
-
 import 'package:flutter/material.dart';
-import '../../../core/config/supabase_config.dart';
-import '../../triagem/models/paciente_model.dart'; // Importe o modelo de Paciente
-import '../../triagem/models/status_paciente.dart'; // Importe o enum de Status
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:fl_chart/fl_chart.dart' as fl;
+
+import '../models/dashboard_metrics_model.dart';
+import '../services/dashboard_service.dart';
+
+class _ChartData {
+  _ChartData(this.x, this.y, this.color);
+  final String x;
+  final double y;
+  final Color color;
+}
 
 class DashboardMetricsScreen extends StatefulWidget {
-  const DashboardMetricsScreen({super.key});
+  const DashboardMetricsScreen({Key? key}) : super(key: key);
 
   @override
   State<DashboardMetricsScreen> createState() => _DashboardMetricsScreenState();
 }
 
 class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
-  // Variáveis de estado para cada métrica
-  int? _totalInscritos;
-  int? _pacientesEmTriagem;
-  int? _pacientesEmAtendimento;
-  double? _mediaIdade;
-  bool _isLoading = true;
+  final DashboardService _dashboardService = DashboardService();
+  late Stream<DashboardMetrics> _metricsStream;
+  int touchedIndex = -1;
+
+  final Color _primaryDark = const Color(0xFF122640);
+  final Color _accentGreen = const Color(0xFF36D97D);
+
+  final Map<String, Color> _statusColors = {
+    'TRIAGEM': Colors.blue.shade800,
+    'CAIXA POSTAL': Colors.purple.shade600,
+    'DESISTÊNCIA': Colors.red.shade700,
+    'ESTÁGIO 4': Colors.teal.shade400,
+    'OUTROS': Colors.grey.shade500,
+    'N/A': Colors.grey.shade400,
+  };
 
   @override
   void initState() {
     super.initState();
-    _carregarMetricas();
+    _metricsStream = _dashboardService.metricsStream;
   }
 
-  Future<void> _carregarMetricas() async {
-    if (mounted) setState(() => _isLoading = true);
-
-    try {
-      // Usamos Future.wait para rodar todas as buscas em paralelo, é mais rápido!
-      final responses = await Future.wait([
-        // 0: Total de inscritos
-        SupabaseConfig.client.from('pacientes_inscritos').count(),
-        // 1: Total em triagem
-        SupabaseConfig.client.from('pacientes_inscritos').count().eq('categoria', StatusPaciente.triagem.valor),
-        // 2: Total em atendimento
-        SupabaseConfig.client.from('pacientes_inscritos').count().eq('categoria', StatusPaciente.emAtendimento.valor),
-        // 3: Datas de nascimento para calcular a média de idade
-        SupabaseConfig.client.from('pacientes_inscritos')
-          .select('data_nascimento')
-          .inFilter('categoria', [StatusPaciente.triagem.valor, StatusPaciente.emAtendimento.valor])
-      ]);
-
-      // Processa as respostas
-      final totalCount = responses[0] as int;
-      final triagemCount = responses[1] as int;
-      final atendimentoCount = responses[2] as int;
-      final pacientesParaMediaIdade = List<Map<String, dynamic>>.from(responses[3] as List);
-
-      final mediaIdade = _calcularMediaIdade(pacientesParaMediaIdade);
-
-      if (mounted) {
-        setState(() {
-          _totalInscritos = totalCount;
-          _pacientesEmTriagem = triagemCount;
-          _pacientesEmAtendimento = atendimentoCount;
-          _mediaIdade = mediaIdade;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao carregar métricas: $e'), backgroundColor: Colors.red));
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  @override
+  void dispose() {
+    _dashboardService.dispose();
+    super.dispose();
   }
 
-  double? _calcularMediaIdade(List<Map<String, dynamic>> pacientes) {
-    if (pacientes.isEmpty) return 0;
-
-    double somaIdades = 0;
-    int pacientesValidos = 0;
-    
-    for (var p in pacientes) {
-      final dataNascStr = p['data_nascimento'];
-      if (dataNascStr != null) {
-        final dataNasc = DateTime.tryParse(dataNascStr);
-        if (dataNasc != null) {
-          final idade = DateTime.now().year - dataNasc.year;
-          somaIdades += idade;
-          pacientesValidos++;
-        }
-      }
-    }
-    return pacientesValidos > 0 ? somaIdades / pacientesValidos : 0;
+  Future<void> _reloadData() async {
+    await _dashboardService.refreshData();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar( /* ... */ ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: GridView.count(
-          crossAxisCount: 4,
-          childAspectRatio: 1.3,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: const Row(children: [
+          Icon(Icons.bar_chart),
+          SizedBox(width: 10),
+          Text('Dashboard de Métricas'),
+        ]),
+        backgroundColor: _primaryDark,
+        foregroundColor: Colors.white,
+        elevation: 2,
+      ),
+      body: StreamBuilder<DashboardMetrics>(
+        stream: _metricsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+            return Center(child: CircularProgressIndicator(color: _accentGreen));
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(snapshot.error.toString(), textAlign: TextAlign.center, style: TextStyle(color: Colors.red.shade700, fontSize: 16)),
+                    const SizedBox(height: 20),
+                    ElevatedButton(onPressed: _reloadData, child: const Text('Tentar Novamente'))
+                  ],
+                ),
+              ),
+            );
+          }
+          if (snapshot.hasData) {
+            final metrics = snapshot.data!;
+            return RefreshIndicator(
+              onRefresh: _reloadData,
+              color: _accentGreen,
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  _buildSectionTitle('Inscritos', Icons.list_alt_rounded),
+                  _buildMainMetrics(metrics),
+                  const SizedBox(height: 24),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _buildStatusPieChart(metrics.statusCount),
+                      _buildAgeBarChart(metrics.ageDistribution),
+                    ],
+                  )
+                ],
+              ),
+            );
+          }
+          return const Center(child: Text('Carregando métricas...'));
+        },
+      ),
+    );
+  }
+  
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: _primaryDark, size: 24),
+              const SizedBox(width: 8),
+              Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _primaryDark)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(thickness: 1.5),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainMetrics(DashboardMetrics metrics) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildMetricCard(context, title: 'Total de Inscritos', value: _isLoading ? '...' : _totalInscritos?.toString() ?? '0', icon: Icons.group, color: Colors.blue),
-            _buildMetricCard(context, title: 'Pacientes em Triagem', value: _isLoading ? '...' : _pacientesEmTriagem?.toString() ?? '0', icon: Icons.hourglass_empty, color: Colors.orange),
-            _buildMetricCard(context, title: 'Em Atendimento', value: _isLoading ? '...' : _pacientesEmAtendimento?.toString() ?? '0', icon: Icons.medical_services, color: Colors.teal),
-            _buildMetricCard(context, title: 'Média de Idade (Ativos)', value: _isLoading ? '...' : '${_mediaIdade?.toStringAsFixed(1) ?? '0'} anos', icon: Icons.cake, color: Colors.purple),
+            Text("Resumo Geral", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _primaryDark)),
+            const SizedBox(height: 16),
+            _buildMetricCard("Total de Pacientes", metrics.totalPacientes.toString(), Icons.people, _primaryDark),
           ],
         ),
       ),
     );
   }
 
-  // Widget auxiliar para construir os cards
-  Widget _buildMetricCard(BuildContext context, {required String title, required String value, required IconData icon, required Color color}) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Flexible(child: Text(title, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8), fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusPieChart(StatusCount statusCount) {
+    final filteredData = Map.fromEntries(statusCount.entries.where((entry) => entry.value > 0));
+    final sortedEntries = filteredData.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topEntries = sortedEntries.take(5).toList();
+    final otherEntries = sortedEntries.skip(5).toList();
+    int othersTotal = otherEntries.fold(0, (sum, entry) => sum + entry.value);
+    final List<MapEntry<String, int>> dataEntries = [...topEntries];
+    if (othersTotal > 0) {
+      dataEntries.add(MapEntry('OUTROS', othersTotal));
+    }
+    double total = dataEntries.fold(0, (sum, entry) => sum + entry.value.toDouble());
+
+    if (dataEntries.isEmpty) {
+      return Container(width: 500, height: 400, alignment: Alignment.center, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 10)]), child: Text('Nenhum dado de status para exibir', style: TextStyle(color: Colors.grey.shade600)));
+    }
+
+    return Container(
+      width: 500,
+      height: 400,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 10)]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Distribuição por Status", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryDark)),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Row(
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  flex: 2,
+                  child: fl.PieChart(
+                    fl.PieChartData(
+                      pieTouchData: fl.PieTouchData(touchCallback: (fl.FlTouchEvent event, pieTouchResponse) {
+                        setState(() {
+                          if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
+                            touchedIndex = -1;
+                            return;
+                          }
+                          touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                        });
+                      }),
+                      borderData: fl.FlBorderData(show: false),
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 50,
+                      sections: List.generate(dataEntries.length, (i) {
+                        final isTouched = i == touchedIndex;
+                        final fontSize = isTouched ? 18.0 : 12.0;
+                        final radius = isTouched ? 70.0 : 60.0;
+                        final shadows = [const Shadow(color: Colors.black, blurRadius: 2)];
+                        final entry = dataEntries[i];
+                        final percentage = total > 0 ? (entry.value / total * 100) : 0;
+                        return fl.PieChartSectionData(
+                          color: _statusColors[entry.key] ?? Colors.orange.shade400,
+                          value: entry.value.toDouble(),
+                          title: '${percentage.toStringAsFixed(0)}%',
+                          radius: radius,
+                          titleStyle: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: Colors.white, shadows: shadows),
+                        );
+                      }),
+                    ),
+                  ),
                 ),
-                Icon(icon, size: 28, color: color.withOpacity(0.7)),
+                const SizedBox(width: 20),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: List.generate(dataEntries.length, (i) {
+                      final entry = dataEntries[i];
+                      final isTouched = i == touchedIndex;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: _buildLegendItem(_statusColors[entry.key] ?? Colors.orange.shade400, "${entry.key} (${entry.value})", isTouched),
+                      );
+                    }),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String text, bool isTouched) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: isTouched ? color.withOpacity(0.15) : Colors.transparent, borderRadius: BorderRadius.circular(4)),
+      child: Row(
+        children: [
+          Container(width: 12, height: 12, color: color),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(fontWeight: isTouched ? FontWeight.bold : FontWeight.normal))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgeBarChart(AgeDistribution ageDistribution) {
+    final chartData = ageDistribution.entries.where((entry) => entry.value > 0).map((entry) => _ChartData(entry.key, entry.value.toDouble(), _accentGreen)).toList();
+    if (chartData.isEmpty) {
+      return Container(width: 500, height: 400, alignment: Alignment.center, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 10)]), child: Text('Nenhum dado de idade para exibir', style: TextStyle(color: Colors.grey.shade600)));
+    }
+    return Container(
+      width: 500,
+      height: 400,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 10)]),
+      child: SfCartesianChart(
+        primaryXAxis: const CategoryAxis(),
+        primaryYAxis: const NumericAxis(majorGridLines: MajorGridLines(width: 0.5)),
+        title: ChartTitle(text: 'Distribuição por Faixa Etária', textStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryDark)),
+        series: <CartesianSeries<_ChartData, String>>[
+          StackedBarSeries<_ChartData, String>(
+            dataSource: chartData,
+            xValueMapper: (_ChartData data, _) => data.x,
+            yValueMapper: (_ChartData data, _) => data.y,
+            pointColorMapper: (_ChartData data, _) => data.color,
+            width: 0.6,
+            borderRadius: BorderRadius.circular(8),
+          )
+        ],
       ),
     );
   }

@@ -1,6 +1,10 @@
+// lib/features/triagem/screens/triagem_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../core/config/supabase_config.dart';
 import '../models/paciente_model.dart';
+import '../models/status_paciente.dart';
 import 'detalhes_paciente_screen.dart';
 
 class TriagemScreen extends StatefulWidget {
@@ -11,6 +15,9 @@ class TriagemScreen extends StatefulWidget {
 }
 
 class _TriagemScreenState extends State<TriagemScreen> {
+  final Color _primaryDark = const Color(0xFF122640);
+  final Color _accentGreen = const Color(0xFF36D97D);
+
   final _searchController = TextEditingController();
   bool _isLoading = true;
   String? _errorMessage;
@@ -33,20 +40,23 @@ class _TriagemScreenState extends State<TriagemScreen> {
   }
 
   Future<void> _carregarDados() async {
-    if (mounted) setState(() { _isLoading = true; _errorMessage = null; });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final response = await SupabaseConfig.client
           .from('pacientes_inscritos')
           .select()
+          // GARANTINDO A ORDEM CORRETA: mais novos primeiro
           .order('data_hora_envio', ascending: false);
 
       final dataList = List<Map<String, dynamic>>.from(response);
 
       final pacientes = dataList.map((json) {
-        if (json['categoria'] == null || (json['categoria'] as String).trim().isEmpty) {
-          json['categoria'] = 'ESPERA';
-        }
         return Paciente.fromJson(json);
       }).toList();
 
@@ -79,46 +89,68 @@ class _TriagemScreenState extends State<TriagemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Pacientes em Triagem'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Theme.of(context).primaryColorDark,
+        title: const Row(
+          children: [
+            Icon(Icons.person_search_outlined),
+            SizedBox(width: 10),
+            Text('Pacientes Inscritos'),
+          ],
+        ),
+        backgroundColor: _primaryDark,
+        foregroundColor: Colors.white,
+        elevation: 2,
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: 'Pesquisar por nome do paciente',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => _searchController.clear(),
-                      )
-                    : null,
-              ),
-            ),
-          ),
+          _buildSearchBar(),
           Expanded(child: _buildContent()),
         ],
       ),
     );
   }
 
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Pesquisar por nome...',
+              prefixIcon: Icon(Icons.search, color: _primaryDark),
+              border: InputBorder.none,
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                      },
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildContent() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator(color: _accentGreen));
+    }
     if (_errorMessage != null) {
-      return Center(child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Text(_errorMessage!, textAlign: TextAlign.center),
-      ));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(_errorMessage!, textAlign: TextAlign.center),
+        ),
+      );
     }
     if (_pacientesFiltrados.isEmpty) {
       return const Center(child: Text('Nenhum paciente encontrado.'));
@@ -126,25 +158,110 @@ class _TriagemScreenState extends State<TriagemScreen> {
 
     return RefreshIndicator(
       onRefresh: _carregarDados,
-      child: ListView.separated(
+      color: _accentGreen,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _pacientesFiltrados.length,
-        separatorBuilder: (context, index) => const Divider(height: 1, indent: 72, endIndent: 16),
         itemBuilder: (context, index) {
           final paciente = _pacientesFiltrados[index];
-          return ListTile(
-            leading: CircleAvatar(child: Text('${index + 1}')),
-            title: Text(paciente.nomeCompleto),
-            subtitle: Text('CPF: ${paciente.cpf ?? 'Não informado'} | Categoria: ${paciente.categoria}'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.of(context).push(
+          return _buildPacienteCard(paciente);
+        },
+      ),
+    );
+  }
+  
+  Widget _buildPacienteCard(Paciente paciente) {
+    final status = StatusPaciente.values.firstWhere(
+      (e) => e.valor == (paciente.categoria?.toUpperCase() ?? 'ESPERA'),
+      orElse: () => StatusPaciente.espera,
+    );
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.of(context)
+              .push(
                 MaterialPageRoute(
                   builder: (context) => DetalhesPacienteScreen(paciente: paciente),
                 ),
-              ).then((_) => _carregarDados());
-            },
-          );
+              )
+              .then((_) => _carregarDados());
         },
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 100,
+              decoration: BoxDecoration(
+                color: status.cor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    paciente.nomeCompleto,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: _primaryDark,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'CPF: ${paciente.cpf ?? 'Não informado'}',
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: status.cor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          status.valor,
+                          style: TextStyle(
+                            color: status.cor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (paciente.dataHoraEnvio != null)
+                        Text(
+                          DateFormat('dd/MM/yyyy').format(paciente.dataHoraEnvio!),
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Icon(Icons.chevron_right, color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
