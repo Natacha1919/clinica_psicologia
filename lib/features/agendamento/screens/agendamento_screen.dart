@@ -1,5 +1,3 @@
-// lib/features/agendamento/screens/agendamento_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -84,10 +82,14 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     final primeiroDia = DateTime(month.year, month.month, 1);
     final ultimoDia = DateTime(month.year, month.month + 1, 0);
     try {
-      final response = await SupabaseConfig.client.from('agendamentos').select()
-          .eq('sala_id', _salaSelecionada!.id)
-          .gte('data_agendamento', DateFormat('yyyy-MM-dd').format(primeiroDia))
-          .lte('data_agendamento', DateFormat('yyyy-MM-dd').format(ultimoDia));
+      final response = await SupabaseConfig.client.rpc(
+        'get_agendamentos_para_periodo',
+        params: {
+          'p_sala_id': _salaSelecionada!.id,
+          'p_start_date': DateFormat('yyyy-MM-dd').format(primeiroDia),
+          'p_end_date': DateFormat('yyyy-MM-dd').format(ultimoDia),
+        },
+      );
       final dataList = List<Map<String, dynamic>>.from(response);
       _agendamentosDoMes.value = dataList.map((json) => Agendamento.fromJson(json)).toList();
     } catch (e) {
@@ -100,16 +102,25 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       ..sort((a,b) => (a.horaInicio.hour * 60 + a.horaInicio.minute).compareTo(b.horaInicio.hour * 60 + b.horaInicio.minute));
   }
   
-  Future<void> _criarAgendamento(TimeOfDay horario, String titulo) async {
+  Future<void> _criarAgendamento({
+    required TimeOfDay horario,
+    required String titulo,
+    required bool isRecorrente,
+    DateTime? dataFimRecorrencia,
+  }) async {
     if (_salaSelecionada == null || _selectedDay == null) return;
     final horaInicio = '${horario.hour.toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
     final horaFim = '${(horario.hour + 1).toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
     final data = DateFormat('yyyy-MM-dd').format(_selectedDay!);
     try {
       await SupabaseConfig.client.from('agendamentos').insert({
-        'sala_id': _salaSelecionada!.id, 'data_agendamento': data,
-        'hora_inicio': horaInicio, 'hora_fim': horaFim,
+        'sala_id': _salaSelecionada!.id,
+        'data_agendamento': data,
+        'hora_inicio': horaInicio,
+        'hora_fim': horaFim,
         'titulo': titulo.isNotEmpty ? titulo : null,
+        'is_recorrente': isRecorrente,
+        'data_fim_recorrencia': isRecorrente ? DateFormat('yyyy-MM-dd').format(dataFimRecorrencia!) : null,
       });
       _showSnackBar('Agendamento confirmado com sucesso!');
       await _fetchAgendamentosDoMes(_focusedDay);
@@ -124,7 +135,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar Exclusão'),
-        content: const Text('Você tem certeza que deseja excluir este agendamento?'),
+        content: const Text('Você tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Excluir'), style: FilledButton.styleFrom(backgroundColor: Colors.red)),
@@ -155,43 +166,88 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   Future<void> _showConfirmationDialog({Agendamento? agendamentoExistente, TimeOfDay? novoHorario}) async {
     final isEditing = agendamentoExistente != null;
     final titleController = TextEditingController(text: isEditing ? agendamentoExistente.titulo : '');
+    bool isRecorrente = isEditing ? agendamentoExistente.isRecorrente : false;
+    DateTime? dataFimRecorrencia = isEditing ? agendamentoExistente.dataFimRecorrencia : null;
+
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(isEditing ? 'Editar Agendamento' : 'Confirmar Agendamento', style: TextStyle(color: _primaryDark)),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
-                Text('Sala: ${_salaSelecionada!.nome}'),
-                Text('Dia: ${DateFormat('dd/MM/yyyy').format(_selectedDay!)}'),
-                Text('Horário: ${isEditing ? agendamentoExistente.horaInicio.format(context) : novoHorario!.format(context)}'),
-                const SizedBox(height: 16),
-                TextField(controller: titleController, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Título do Agendamento')),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(isEditing ? 'Editar Agendamento' : 'Confirmar Agendamento', style: TextStyle(color: _primaryDark)),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: <Widget>[
+                    Text('Sala: ${_salaSelecionada!.nome}'),
+                    Text('Dia: ${DateFormat('dd/MM/yyyy').format(_selectedDay!)}'),
+                    Text('Horário: ${isEditing ? agendamentoExistente.horaInicio.format(context) : novoHorario!.format(context)}'),
+                    const SizedBox(height: 16),
+                    TextField(controller: titleController, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Título do Agendamento')),
+                    const SizedBox(height: 16),
+                    if (!isEditing)
+                      CheckboxListTile(
+                        title: const Text('Agendamento Fixo (Semanal)'),
+                        value: isRecorrente,
+                        onChanged: (bool? value) {
+                          setDialogState(() {
+                            isRecorrente = value ?? false;
+                            if (!isRecorrente) dataFimRecorrencia = null;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    if (isRecorrente && !isEditing)
+                      ListTile(
+                        title: Text(dataFimRecorrencia == null ? 'Selecionar data de término' : 'Término em: ${DateFormat('dd/MM/yyyy').format(dataFimRecorrencia!)}'),
+                        trailing: const Icon(Icons.calendar_today),
+                        contentPadding: EdgeInsets.zero,
+                        onTap: () async {
+                          final pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now().add(const Duration(days: 90)),
+                            firstDate: _selectedDay!,
+                            lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                          );
+                          if (pickedDate != null) {
+                            setDialogState(() => dataFimRecorrencia = pickedDate);
+                          }
+                        },
+                      )
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(child: const Text('Cancelar'), onPressed: () => Navigator.of(context).pop()),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: _accentGreen),
+                  child: Text(isEditing ? 'Salvar' : 'Confirmar'),
+                  onPressed: () {
+                    if (isRecorrente && dataFimRecorrencia == null && !isEditing) {
+                      _showSnackBar('Selecione uma data de término para o agendamento fixo.', isError: true);
+                      return;
+                    }
+                    if (isEditing) {
+                      _editarAgendamento(agendamentoExistente, titleController.text);
+                    } else {
+                      _criarAgendamento(
+                        horario: novoHorario!,
+                        titulo: titleController.text,
+                        isRecorrente: isRecorrente,
+                        dataFimRecorrencia: dataFimRecorrencia,
+                      );
+                    }
+                    Navigator.of(context).pop();
+                  },
+                ),
               ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(child: const Text('Cancelar'), onPressed: () => Navigator.of(context).pop()),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _accentGreen),
-              child: Text(isEditing ? 'Salvar' : 'Confirmar'),
-              onPressed: () {
-                if (isEditing) {
-                  _editarAgendamento(agendamentoExistente, titleController.text);
-                } else {
-                  _criarAgendamento(novoHorario!, titleController.text);
-                }
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
+            );
+          },
         );
       },
     );
   }
-
-  // --- WIDGETS DE CONSTRUÇÃO DA UI ---
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +324,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
               },
               onPageChanged: (focusedDay) {
                 _focusedDay = focusedDay;
-                // A busca agora acontece apenas ao mudar de página
                 _fetchAgendamentosDoMes(focusedDay);
               },
               eventLoader: _getAgendamentosParaDia,
@@ -276,28 +331,14 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                 markerBuilder: (context, day, events) {
                   if (events.isNotEmpty) {
                     return Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 4,
-                      child: Container(
-                        height: 7,
-                        width: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _accentGreen,
-                        ),
-                      ),
+                      left: 0, right: 0, bottom: 4,
+                      child: Container(height: 7, width: 7, decoration: BoxDecoration(shape: BoxShape.circle, color: _accentGreen)),
                     );
                   }
                   return null;
                 },
               ),
-              calendarStyle: CalendarStyle(
-                selectedDecoration: BoxDecoration(color: _primaryDark, shape: BoxShape.circle),
-                todayDecoration: BoxDecoration(color: _primaryDark.withOpacity(0.5), shape: BoxShape.circle),
-                weekendTextStyle: const TextStyle(color: Colors.redAccent),
-                cellMargin: const EdgeInsets.all(6.0),
-              ),
+              calendarStyle: CalendarStyle(selectedDecoration: BoxDecoration(color: _primaryDark, shape: BoxShape.circle), todayDecoration: BoxDecoration(color: _primaryDark.withOpacity(0.5), shape: BoxShape.circle), weekendTextStyle: const TextStyle(color: Colors.redAccent), cellMargin: const EdgeInsets.all(6.0)),
               headerStyle: const HeaderStyle(titleCentered: true, formatButtonVisible: false),
             );
           },
@@ -308,14 +349,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
 
   Widget _buildDayDetails() {
     if (_salaSelecionada == null || _selectedDay == null) {
-      return Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: const SizedBox(
-          height: 100,
-          child: Center(child: Text('Selecione uma sala e um dia para ver os detalhes.')),
-        ),
-      );
+      return Card(elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), child: const SizedBox(height: 100, child: Center(child: Text('Selecione uma sala e um dia para ver os detalhes.'))));
     }
     return _isModoAgendamento ? _buildTimeSlotsGrid() : _buildAppointmentList();
   }
@@ -348,7 +382,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                 itemBuilder: (context, index) {
                   final agendamento = agendamentosDoDia[index];
                   return ListTile(
-                    leading: Icon(Icons.access_time_filled_rounded, color: _primaryDark),
+                    leading: Icon(agendamento.isRecorrente ? Icons.sync_rounded : Icons.access_time_filled_rounded, color: _primaryDark),
                     title: Text(agendamento.titulo ?? 'Sem título', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('${agendamento.horaInicio.format(context)} - ${agendamento.horaFim.format(context)}'),
                     trailing: Row(
@@ -366,11 +400,11 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       ),
     );
   }
-
+  
   List<TimeOfDay> _gerarHorariosParaDia(DateTime dia) {
     List<TimeOfDay> horarios = [];
-    if (dia.weekday == DateTime.sunday) {
-    } else if (dia.weekday >= DateTime.monday && dia.weekday <= DateTime.friday) {
+    if (dia.weekday == DateTime.sunday) {} 
+    else if (dia.weekday >= DateTime.monday && dia.weekday <= DateTime.friday) {
       for (int i = 8; i < 14; i++) { horarios.add(TimeOfDay(hour: i, minute: 0)); }
       for (int i = 16; i < 22; i++) { horarios.add(TimeOfDay(hour: i, minute: 0)); }
     } else if (dia.weekday == DateTime.saturday) {
@@ -379,11 +413,18 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     return horarios;
   }
   
+  // FUNÇÃO CORRIGIDA: Lógica de verificação simplificada
   bool _isHorarioOcupado(TimeOfDay horario) {
+    // Pega a lista de agendamentos para o dia selecionado.
+    // Esta lista já contém as ocorrências de agendamentos recorrentes, graças à nossa função no Supabase.
+    final agendamentosDoDia = _getAgendamentosParaDia(_selectedDay!);
+
+    // Converte TimeOfDay para um double para facilitar a comparação (ex: 8:30 -> 8.5)
     double toDouble(TimeOfDay t) => t.hour + t.minute / 60.0;
     final horarioDouble = toDouble(horario);
-    return _agendamentosDoMes.value.any((agendamento) {
-      if (!isSameDay(agendamento.dataAgendamento, _selectedDay)) return false;
+
+    // Verifica se existe algum agendamento na lista do dia que conflita com o horário
+    return agendamentosDoDia.any((agendamento) {
       final inicioDouble = toDouble(agendamento.horaInicio);
       final fimDouble = toDouble(agendamento.horaFim);
       return horarioDouble >= inicioDouble && horarioDouble < fimDouble;
