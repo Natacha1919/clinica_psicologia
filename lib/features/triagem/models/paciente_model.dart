@@ -1,7 +1,7 @@
 class Paciente {
   final String id;
   final DateTime createdAt;
-  final String? categoria;
+  String? categoria; // status do paciente (pode ser alterado)
   final DateTime? dataHoraEnvio; // Aqui só a data
   final String? telefone;
   final DateTime? dataNascimento;
@@ -78,13 +78,15 @@ class Paciente {
 
     return Paciente(
       id: _safeGetString(json['id']) ?? 'id_invalido',
-      createdAt: _parseDate(_safeGetString(json['created_at'])) ?? DateTime.now(),
+      createdAt:
+          _parseDate(_safeGetString(json['created_at'])) ?? DateTime.now(),
       categoria: categoriaFinal ?? 'ESPERA',
       dataHoraEnvio: _parseDate(_safeGetString(json['data_hora_envio'])),
       telefone: _safeGetString(json['telefone']),
       dataNascimento: _parseDate(_safeGetString(json['data_nascimento'])),
       idadeTexto: _safeGetString(json['idade_texto']),
-      nomeCompleto: _safeGetString(json['nome_completo']) ?? 'Nome não informado',
+      nomeCompleto:
+          _safeGetString(json['nome_completo']) ?? 'Nome não informado',
       termoConsentimento: _safeGetString(json['termo_consentimento']),
       nomeSocial: _safeGetString(json['nome_social']),
       cpf: _safeGetString(json['cpf']),
@@ -104,5 +106,12 @@ class Paciente {
       horariosPreferenciais: _safeGetString(json['horarios_preferenciais']),
       poloEad: _safeGetString(json['polo_ead']),
     );
+  }
+
+  // Método para alterar o status/categoria do paciente
+  void atualizarStatus(String novoStatus) {
+    categoria = novoStatus;
+    // Se estiver usando provider ou algum gerenciador de estado, notifique aqui
+    // Exemplo: notifyListeners(); (se Paciente for um ChangeNotifier)
   }
 }

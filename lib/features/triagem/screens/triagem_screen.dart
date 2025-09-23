@@ -11,6 +11,9 @@ class TriagemScreen extends StatefulWidget {
 }
 
 class _TriagemScreenState extends State<TriagemScreen> {
+  final Color _primaryDark = const Color(0xFF122640);
+  final Color _accentGreen = const Color(0xFF36D97D);
+
   final _searchController = TextEditingController();
   bool _isLoading = true;
   String? _errorMessage;
@@ -33,7 +36,11 @@ class _TriagemScreenState extends State<TriagemScreen> {
   }
 
   Future<void> _carregarDados() async {
-    if (mounted) setState(() { _isLoading = true; _errorMessage = null; });
+    if (mounted)
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
 
     try {
       final response = await SupabaseConfig.client
@@ -44,7 +51,8 @@ class _TriagemScreenState extends State<TriagemScreen> {
       final dataList = List<Map<String, dynamic>>.from(response);
 
       final pacientes = dataList.map((json) {
-        if (json['categoria'] == null || (json['categoria'] as String).trim().isEmpty) {
+        if (json['categoria'] == null ||
+            (json['categoria'] as String).trim().isEmpty) {
           json['categoria'] = 'ESPERA';
         }
         return Paciente.fromJson(json);
@@ -79,23 +87,35 @@ class _TriagemScreenState extends State<TriagemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Pacientes em Triagem'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Theme.of(context).primaryColorDark,
+        // AQUI ESTÁ A MUDANÇA DO TÍTULO COM ÍCONE 👇
+        title: const Row(
+          children: [
+            Icon(Icons.list_alt_rounded),
+            SizedBox(width: 10),
+            Text('Pacientes em Triagem'),
+          ],
+        ),
+        backgroundColor: _primaryDark,
+        foregroundColor: Colors.white,
+        elevation: 2,
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 labelText: 'Pesquisar por nome do paciente',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: Icon(Icons.search, color: _primaryDark),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: _accentGreen, width: 2),
                 ),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -113,12 +133,15 @@ class _TriagemScreenState extends State<TriagemScreen> {
   }
 
   Widget _buildContent() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading)
+      return Center(child: CircularProgressIndicator(color: _accentGreen));
     if (_errorMessage != null) {
-      return Center(child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Text(_errorMessage!, textAlign: TextAlign.center),
-      ));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(_errorMessage!, textAlign: TextAlign.center),
+        ),
+      );
     }
     if (_pacientesFiltrados.isEmpty) {
       return const Center(child: Text('Nenhum paciente encontrado.'));
@@ -126,22 +149,43 @@ class _TriagemScreenState extends State<TriagemScreen> {
 
     return RefreshIndicator(
       onRefresh: _carregarDados,
+      color: _accentGreen,
       child: ListView.separated(
         itemCount: _pacientesFiltrados.length,
-        separatorBuilder: (context, index) => const Divider(height: 1, indent: 72, endIndent: 16),
+        separatorBuilder: (context, index) =>
+            const Divider(height: 1, indent: 72, endIndent: 16),
         itemBuilder: (context, index) {
           final paciente = _pacientesFiltrados[index];
           return ListTile(
-            leading: CircleAvatar(child: Text('${index + 1}')),
-            title: Text(paciente.nomeCompleto),
-            subtitle: Text('CPF: ${paciente.cpf ?? 'Não informado'} | Categoria: ${paciente.categoria}'),
-            trailing: const Icon(Icons.chevron_right),
+            leading: CircleAvatar(
+              backgroundColor: _primaryDark,
+              foregroundColor: Colors.white,
+              child: Text(
+                paciente.nomeCompleto.isNotEmpty
+                    ? paciente.nomeCompleto[0].toUpperCase()
+                    : '?',
+              ),
+            ),
+            title: Text(
+              paciente.nomeCompleto,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _primaryDark,
+              ),
+            ),
+            subtitle: Text(
+              'CPF: ${paciente.cpf ?? 'Não informado'} | Categoria: ${paciente.categoria?.toUpperCase() ?? 'ESPERA'}',
+            ),
+            trailing: Icon(Icons.chevron_right, color: _accentGreen),
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => DetalhesPacienteScreen(paciente: paciente),
-                ),
-              ).then((_) => _carregarDados());
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          DetalhesPacienteScreen(paciente: paciente),
+                    ),
+                  )
+                  .then((_) => _carregarDados());
             },
           );
         },
