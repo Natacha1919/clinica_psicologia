@@ -1,14 +1,12 @@
 // lib/main.dart
-
-import 'package:clinica_psicologi/app_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+// NOVO: Import da nossa tela de Splash
+import 'package:clinica_psicologi/features/auth/screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Inicializa os dados de formatação para o português do Brasil
   await initializeDateFormatting('pt_BR', null);
 
   // Inicializa o Supabase com a chave de API correta
@@ -28,15 +26,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Clínica Escola Psicologia',
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        navigationRailTheme: const NavigationRailThemeData(
-          indicatorColor: Color(0xFFB2DFDB),
-        ),
-      ),
+      theme: ThemeData( /* ... seu tema ... */ ),
       debugShowCheckedModeBanner: false,
-      home: const AppScaffold(),
+      // ALTERADO: A tela inicial agora é a SplashScreen
+      home: const SplashScreen(),
     );
   }
 }
