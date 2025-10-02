@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum StatusPaciente {
-  triagem('TRIAGEM', Colors.orange),
+  triagem('Encerrou com a Clínica', Color.fromARGB(255, 0, 17, 255)),
   emAtendimento('EM ATENDIMENTO', Colors.teal),
   aguardandoVaga('AGUARDANDO VAGA', Colors.blueAccent),
   alta('ALTA', Colors.grey),

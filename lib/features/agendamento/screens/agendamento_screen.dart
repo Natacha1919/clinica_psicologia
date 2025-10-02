@@ -1,3 +1,5 @@
+// lib/features/agendamento/screens/agendamento_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -249,23 +251,75 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(title: const Row(children: [Icon(Icons.calendar_month_outlined), SizedBox(width: 10), Text('Agendamento de Salas')]), backgroundColor: _primaryDark, foregroundColor: Colors.white, elevation: 2),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          _buildRoomSelector(),
-          const SizedBox(height: 24),
-          _buildCalendar(),
-          const Divider(height: 32),
-          _buildDayDetails(),
-        ],
+      appBar: AppBar(
+        title: const Row(children: [Icon(Icons.calendar_month_outlined), SizedBox(width: 10), Text('Agendamento de Salas')]),
+        backgroundColor: _primaryDark,
+        foregroundColor: Colors.white,
+        elevation: 2,
+      ),
+      // NOVO: Usando LayoutBuilder para criar um layout responsivo
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Se a tela for larga (ex: desktop), usa o layout de duas colunas
+          if (constraints.maxWidth > 800) {
+            return _buildWideLayout();
+          }
+          // Se for estreita (ex: celular), usa o layout de uma coluna
+          else {
+            return _buildNarrowLayout();
+          }
+        },
       ),
     );
   }
+
+  // NOVO: Layout para telas largas (duas colunas)
+  Widget _buildWideLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Coluna da Esquerda: Controles
+        SizedBox(
+          width: 400, // Largura fixa para a coluna de controle
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              _buildRoomSelector(),
+              const SizedBox(height: 24),
+              _buildCalendar(),
+            ],
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        // Coluna da Direita: Detalhes do Dia
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: _buildDayDetails(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NOVO: Layout para telas estreitas (uma coluna)
+  Widget _buildNarrowLayout() {
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        _buildRoomSelector(),
+        const SizedBox(height: 24),
+        _buildCalendar(),
+        const SizedBox(height: 24),
+        _buildDayDetails(),
+      ],
+    );
+  }
+
 
   Widget _buildRoomSelector() {
     return Card(
