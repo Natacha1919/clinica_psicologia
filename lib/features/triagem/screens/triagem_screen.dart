@@ -98,8 +98,6 @@ class _TriagemScreenState extends State<TriagemScreen> {
             Text('Pacientes Inscritos'),
           ],
         ),
-        backgroundColor: _primaryDark,
-        foregroundColor: Colors.white,
         elevation: 2,
       ),
       body: Column(

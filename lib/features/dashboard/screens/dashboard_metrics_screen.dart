@@ -1,3 +1,5 @@
+// lib/features/dashboard/screens/dashboard_metrics_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:fl_chart/fl_chart.dart' as fl;
@@ -5,6 +7,7 @@ import 'package:fl_chart/fl_chart.dart' as fl;
 import '../models/dashboard_metrics_model.dart';
 import '../services/dashboard_service.dart';
 
+// Classe auxiliar para o gráfico da Syncfusion (barras)
 class _ChartData {
   _ChartData(this.x, this.y, this.color);
   final String x;
@@ -22,7 +25,8 @@ class DashboardMetricsScreen extends StatefulWidget {
 class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
   final DashboardService _dashboardService = DashboardService();
   late Stream<DashboardMetrics> _metricsStream;
-  int touchedIndex = -1;
+  int _statusTouchedIndex = -1; // Índice de toque para o gráfico de Status
+  int _vinculoTouchedIndex = -1; // NOVO: Índice de toque para o gráfico de Vínculo
 
   final Color _primaryDark = const Color(0xFF122640);
   final Color _accentGreen = const Color(0xFF36D97D);
@@ -34,6 +38,15 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
     'ESTÁGIO 4': Colors.teal.shade400,
     'OUTROS': Colors.grey.shade500,
     'N/A': Colors.grey.shade400,
+    // Adicione mais cores se necessário para status específicos
+  };
+
+  // NOVO: Mapeamento de cores para o gráfico de Vínculo
+  final Map<String, Color> _vinculoColors = {
+    'SIM': const Color(0xFF36D97D), // Verde
+    'NÃO': Colors.orange.shade600, // Laranja
+    'NÃO INFORMADO': Colors.grey.shade400, // Cinza
+    'OUTROS': Colors.blue.shade400, // Azul claro para outros vínculos
   };
 
   @override
@@ -62,8 +75,6 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
           SizedBox(width: 10),
           Text('Dashboard de Métricas'),
         ]),
-        backgroundColor: _primaryDark,
-        foregroundColor: Colors.white,
         elevation: 2,
       ),
       body: StreamBuilder<DashboardMetrics>(
@@ -103,6 +114,7 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
                     runSpacing: 16,
                     alignment: WrapAlignment.center,
                     children: [
+                      _buildVinculoPieChart(metrics.vinculoCount), // NOVO: Chamada para o gráfico de Vínculo
                       _buildStatusPieChart(metrics.statusCount),
                       _buildAgeBarChart(metrics.ageDistribution),
                     ],
@@ -116,7 +128,7 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
       ),
     );
   }
-  
+
   Widget _buildSectionTitle(String title, IconData icon) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -180,6 +192,117 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
     );
   }
 
+  // NOVO: Widget para o gráfico de pizza de Vínculo Institucional (Agora Interativo e Agrupado)
+  Widget _buildVinculoPieChart(Map<String, int> vinculoCount) {
+    // 1. Agrupar os dados de Vínculo
+    int simTotal = 0;
+    int naoTotal = 0;
+    int naoInformadoTotal = 0;
+    Map<String, int> otherVinculos = {}; // Para agrupar o que não for SIM/NÃO/NÃO INFORMADO
+
+    vinculoCount.forEach((key, value) {
+      if (key.toUpperCase().contains('SIM')) {
+        simTotal += value;
+      } else if (key.toUpperCase().contains('NÃO')) {
+        naoTotal += value;
+      } else if (key.toUpperCase().contains('NÃO INFORMADO')) {
+        naoInformadoTotal += value;
+      } else {
+        otherVinculos[key.toUpperCase()] = value;
+      }
+    });
+
+    final List<MapEntry<String, int>> processedEntries = [];
+    if (simTotal > 0) processedEntries.add(MapEntry('SIM', simTotal));
+    if (naoTotal > 0) processedEntries.add(MapEntry('NÃO', naoTotal));
+    if (naoInformadoTotal > 0) processedEntries.add(MapEntry('NÃO INFORMADO', naoInformadoTotal));
+
+    // Se houver "outros" vínculos, adicione-os como uma única fatia "OUTROS"
+    int othersTotal = otherVinculos.values.fold(0, (sum, item) => sum + item);
+    if (othersTotal > 0) {
+      processedEntries.add(MapEntry('OUTROS', othersTotal));
+    }
+
+    double total = processedEntries.fold(0, (sum, entry) => sum + entry.value.toDouble());
+    if (processedEntries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: 500, // Largura similar ao gráfico de Status
+      height: 400,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 10)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Vínculo Institucional", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryDark)),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: fl.PieChart(
+                    fl.PieChartData(
+                      pieTouchData: fl.PieTouchData(touchCallback: (fl.FlTouchEvent event, pieTouchResponse) {
+                        setState(() {
+                          if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
+                            _vinculoTouchedIndex = -1;
+                            return;
+                          }
+                          _vinculoTouchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                        });
+                      }),
+                      borderData: fl.FlBorderData(show: false),
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 50,
+                      sections: List.generate(processedEntries.length, (i) {
+                        final isTouched = i == _vinculoTouchedIndex;
+                        final fontSize = isTouched ? 18.0 : 12.0;
+                        final radius = isTouched ? 70.0 : 60.0;
+                        final shadows = [const Shadow(color: Colors.black, blurRadius: 2)];
+                        final entry = processedEntries[i];
+                        final percentage = total > 0 ? (entry.value / total * 100) : 0;
+                        return fl.PieChartSectionData(
+                          color: _vinculoColors[entry.key] ?? Colors.blue, // Usar as cores do vínculo
+                          value: entry.value.toDouble(),
+                          title: '${percentage.toStringAsFixed(0)}%',
+                          radius: radius,
+                          titleStyle: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: Colors.white, shadows: shadows),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: List.generate(processedEntries.length, (i) {
+                      final entry = processedEntries[i];
+                      final isTouched = i == _vinculoTouchedIndex;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: _buildLegendItem(_vinculoColors[entry.key] ?? Colors.blue, "${entry.key} (${entry.value})", isTouched),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusPieChart(StatusCount statusCount) {
     final filteredData = Map.fromEntries(statusCount.entries.where((entry) => entry.value > 0));
     final sortedEntries = filteredData.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -191,11 +314,9 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
       dataEntries.add(MapEntry('OUTROS', othersTotal));
     }
     double total = dataEntries.fold(0, (sum, entry) => sum + entry.value.toDouble());
-
     if (dataEntries.isEmpty) {
-      return Container(width: 500, height: 400, alignment: Alignment.center, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 10)]), child: Text('Nenhum dado de status para exibir', style: TextStyle(color: Colors.grey.shade600)));
+      return const SizedBox.shrink();
     }
-
     return Container(
       width: 500,
       height: 400,
@@ -216,17 +337,17 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
                       pieTouchData: fl.PieTouchData(touchCallback: (fl.FlTouchEvent event, pieTouchResponse) {
                         setState(() {
                           if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
-                            touchedIndex = -1;
+                            _statusTouchedIndex = -1; // Usar o novo índice
                             return;
                           }
-                          touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                          _statusTouchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex; // Usar o novo índice
                         });
                       }),
                       borderData: fl.FlBorderData(show: false),
                       sectionsSpace: 2,
                       centerSpaceRadius: 50,
                       sections: List.generate(dataEntries.length, (i) {
-                        final isTouched = i == touchedIndex;
+                        final isTouched = i == _statusTouchedIndex; // Usar o novo índice
                         final fontSize = isTouched ? 18.0 : 12.0;
                         final radius = isTouched ? 70.0 : 60.0;
                         final shadows = [const Shadow(color: Colors.black, blurRadius: 2)];
@@ -251,7 +372,7 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: List.generate(dataEntries.length, (i) {
                       final entry = dataEntries[i];
-                      final isTouched = i == touchedIndex;
+                      final isTouched = i == _statusTouchedIndex; // Usar o novo índice
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
                         child: _buildLegendItem(_statusColors[entry.key] ?? Colors.orange.shade400, "${entry.key} (${entry.value})", isTouched),
@@ -285,7 +406,7 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
   Widget _buildAgeBarChart(AgeDistribution ageDistribution) {
     final chartData = ageDistribution.entries.where((entry) => entry.value > 0).map((entry) => _ChartData(entry.key, entry.value.toDouble(), _accentGreen)).toList();
     if (chartData.isEmpty) {
-      return Container(width: 500, height: 400, alignment: Alignment.center, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 10)]), child: Text('Nenhum dado de idade para exibir', style: TextStyle(color: Colors.grey.shade600)));
+      return const SizedBox.shrink();
     }
     return Container(
       width: 500,

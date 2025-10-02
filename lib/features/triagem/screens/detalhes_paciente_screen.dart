@@ -1,7 +1,13 @@
 // lib/features/triagem/screens/detalhes_paciente_screen.dart
 
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
 import '../../../core/config/supabase_config.dart';
 import '../models/paciente_model.dart';
 import '../models/status_paciente.dart';
@@ -66,15 +72,111 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> {
     }
   }
 
+  Future<void> _generatePdf() async {
+    final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
+    final ttf = pw.Font.ttf(fontData);
+    final boldFontData = await rootBundle.load("assets/fonts/Roboto-Bold.ttf");
+    final boldTtf = pw.Font.ttf(boldFontData);
+
+    final pdf = pw.Document();
+
+    final dataMap = {
+      'Informações Pessoais': {
+        'Nome Completo': widget.paciente.nomeCompleto,
+        'Nome Social': widget.paciente.nomeSocial,
+        'CPF': widget.paciente.cpf,
+        'Telefone': widget.paciente.telefone,
+        'Email Principal': widget.paciente.email,
+        'Email Secundário': widget.paciente.emailSecundario,
+        'Data de Nascimento': widget.paciente.dataNascimento != null ? DateFormat('dd/MM/yyyy').format(widget.paciente.dataNascimento!) : null,
+        'Idade': widget.paciente.idadeTexto,
+        'Estado Civil': widget.paciente.estadoCivil,
+        'Religião': widget.paciente.religiao,
+        'Endereço': widget.paciente.endereco,
+      },
+      'Informações Familiares': {
+        'Nome da Mãe': widget.paciente.nomeMae,
+        'Nome do Pai': widget.paciente.nomePai,
+        'Renda Mensal': widget.paciente.rendaMensal,
+      },
+      'Preferências de Atendimento': {
+        'Modalidade': widget.paciente.modalidadePreferencial,
+        'Dias Preferenciais': widget.paciente.diasPreferenciais,
+        'Horários Preferenciais': widget.paciente.horariosPreferenciais,
+      },
+      'Vínculo Institucional': {
+        'Vínculo UNIFECAF': widget.paciente.vinculoUnifecafStatus,
+        'Detalhe do Vínculo': widget.paciente.vinculoUnifecafDetalhe,
+        'Encaminhamento': widget.paciente.encaminhamento,
+        'Polo EAD': widget.paciente.poloEad,
+      },
+      'Gerenciamento': {
+        'Categoria Atual': _statusAtual.valor,
+        'Data de Inscrição': widget.paciente.dataHoraEnvio != null ? DateFormat('dd/MM/yyyy HH:mm').format(widget.paciente.dataHoraEnvio!) : null,
+        'Termo de Consentimento': widget.paciente.termoConsentimento,
+      }
+    };
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        theme: pw.ThemeData.withFont(base: ttf, bold: boldTtf),
+        header: (context) => pw.Header(
+          level: 0,
+          child: pw.Text('Ficha de Dados do Paciente - Clínica', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
+        ),
+        build: (context) {
+          final List<pw.Widget> widgets = [];
+          
+          dataMap.forEach((sectionTitle, sectionData) {
+            widgets.add(pw.Header(level: 1, text: sectionTitle));
+            
+            sectionData.forEach((label, value) {
+              if (value != null && value.isNotEmpty) {
+                widgets.add(
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 4.0),
+                    child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.SizedBox(
+                          width: 150,
+                          child: pw.Text('$label:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        ),
+                        pw.Expanded(child: pw.Text(value)),
+                      ],
+                    ),
+                  ),
+                );
+              }
+            });
+            widgets.add(pw.SizedBox(height: 20));
+          });
+
+          return widgets;
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('Detalhes do Paciente'),
-        backgroundColor: _primaryDark,
-        foregroundColor: Colors.white,
         elevation: 2,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'Gerar PDF',
+            onPressed: _generatePdf,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -143,7 +245,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> {
                 _buildDetailRow(
                   'Data de Inscrição',
                   widget.paciente.dataHoraEnvio != null
-                      ? DateFormat('dd/MM/yyyy').format(widget.paciente.dataHoraEnvio!)
+                      ? DateFormat('dd/MM/yyyy HH:mm').format(widget.paciente.dataHoraEnvio!)
                       : 'Não informada',
                 ),
                 _buildDetailRow('Termo de Consentimento', widget.paciente.termoConsentimento ?? 'Não informado'),

@@ -1,3 +1,5 @@
+// lib/features/dashboard/services/dashboard_service.dart
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,11 +24,17 @@ class DashboardService {
   Future<void> _fetchData() async {
     try {
       final response = await _supabase.rpc('get_dashboard_metrics');
+
       final data = response as Map<String, dynamic>;
       final totalPacientes = data['totalPacientes'] as int? ?? 0;
+      
       final statusCountRaw = data['statusCount'] as Map<String, dynamic>? ?? {};
       final statusCount = statusCountRaw.map((key, value) => MapEntry(key.toUpperCase(), value as int));
       
+      // NOVO: Processa os dados de Vínculo
+      final vinculoCountRaw = data['vinculoCount'] as Map<String, dynamic>? ?? {};
+      final vinculoCount = vinculoCountRaw.map((key, value) => MapEntry(key.toUpperCase(), value as int));
+
       final ageResponse = await _supabase.from('pacientes_inscritos').select('data_nascimento');
       final ageDistribution = _calculateAgeDistribution(ageResponse);
       
@@ -34,11 +42,13 @@ class DashboardService {
         totalPacientes: totalPacientes,
         statusCount: statusCount,
         ageDistribution: ageDistribution,
+        vinculoCount: vinculoCount, // NOVO
       );
 
       if (!_metricsController.isClosed) {
         _metricsController.add(metrics);
       }
+
     } catch (e) {
       debugPrint('Erro ao buscar métricas: $e');
       if (!_metricsController.isClosed) {

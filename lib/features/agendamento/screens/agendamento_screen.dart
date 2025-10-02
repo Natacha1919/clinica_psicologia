@@ -257,8 +257,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Row(children: [Icon(Icons.calendar_month_outlined), SizedBox(width: 10), Text('Agendamento de Salas')]),
-        backgroundColor: _primaryDark,
-        foregroundColor: Colors.white,
         elevation: 2,
       ),
       // NOVO: Usando LayoutBuilder para criar um layout responsivo
