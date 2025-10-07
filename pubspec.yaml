@@ -48,6 +48,8 @@ flutter:
   # Declaração da pasta de assets para que as fontes sejam encontradas
   assets:
     - assets/fonts/
+    - assets/images/ # <-- ADICIONE ESTA LINHA
+
 
   # Declaração das fontes customizadas para o PDF
   fonts:
