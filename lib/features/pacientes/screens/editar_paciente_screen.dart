@@ -22,12 +22,24 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     'PSICOTERAPIA',
     'AVALIAÇÃO NEUROPSICOLÓGICA',
   ];
+  final List<String> _opcoesStatus = [
+    'BR - AGUARDANDO ATENDIMENTO',
+    'PG - AGUARDANDO ATENDIMENTO',
+    'BR - ATIVO',
+    'BR - ENCERRADO',
+    'PG - ATIVO',
+    'PG - ENCERRADO',
+    'ISENTO COLABORADOR',
+    'ISENTO COLABORADOR - ENCERRADO',
+    'ISENTO - ORIENTAÇÃO P.',
+  ];
 
   late final TextEditingController _nomeController;
   late final TextEditingController _cpfController;
   late final TextEditingController _telefoneController;
   late final TextEditingController _enderecoController;
   late final TextEditingController _demandaInicialController;
+  late String _selectedStatus;
 
   @override
   void initState() {
@@ -37,6 +49,13 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     _telefoneController = TextEditingController(text: widget.paciente.telefone);
     _enderecoController = TextEditingController(text: widget.paciente.endereco);
     _demandaInicialController = TextEditingController(text: widget.paciente.demandaInicial);
+    
+    final String? initialStatus = widget.paciente.statusDetalhado;
+    if (initialStatus != null && _opcoesStatus.contains(initialStatus)) {
+      _selectedStatus = initialStatus;
+    } else {
+      _selectedStatus = _opcoesStatus.first;
+    }
   }
 
   @override
@@ -48,8 +67,8 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     _demandaInicialController.dispose();
     super.dispose();
   }
+
   Future<void> _salvarAlteracoes() async {
-    // Valida o formulário
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -59,17 +78,18 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     try {
       final supabase = Supabase.instance.client;
       
-      // Monta o mapa de dados a serem atualizados
+      final bool isEncerrado = _selectedStatus.toUpperCase().contains('ENCERRADO');
+
       final updates = {
         'nome_completo': _nomeController.text,
         'cpf': _cpfController.text,
         'contato': _telefoneController.text,
         'endereco': _enderecoController.text,
         'demanda_inicial': _demandaInicialController.text,
-        // Adicione outros campos aqui conforme necessário
+        'status_detalhado': _selectedStatus,
+        'data_desligamento': isEncerrado ? DateTime.now().toIso8601String() : null,
       };
 
-      // Envia o comando UPDATE para o Supabase
       await supabase
           .from('pacientes_historico_temp')
           .update(updates)
@@ -79,7 +99,6 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Informações salvas com sucesso!'), backgroundColor: Colors.green),
         );
-        // Retorna para a tela anterior, enviando um sinal de 'true' para indicar que houve sucesso
         Navigator.of(context).pop(true);
       }
     } catch (e) {
@@ -95,7 +114,7 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     }
   }
 
-   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -130,18 +149,14 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
               ),
               const SizedBox(height: 16),
               Autocomplete<String>(
-                // --- MUDANÇA PRINCIPAL AQUI ---
                 optionsBuilder: (TextEditingValue textEditingValue) {
-                  // Se o campo estiver vazio, retorna a lista COMPLETA.
                   if (textEditingValue.text.isEmpty) {
                     return _opcoesDemanda;
                   }
-                  // Se o usuário digitou algo, filtra a lista.
                   return _opcoesDemanda.where((String option) {
                     return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                   });
                 },
-                // --- FIM DA MUDANÇA ---
                 fieldViewBuilder: (BuildContext context, TextEditingController fieldController,
                     FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -158,31 +173,23 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
                   _demandaInicialController.text = selection;
                    FocusScope.of(context).unfocus();
                 },
-                optionsViewBuilder: (context, onSelected, options) {
-                  return Align(
-                    alignment: Alignment.topLeft,
-                    child: Material(
-                      elevation: 4.0,
-                      child: SizedBox(
-                        width: MediaQuery.of(context).size.width - 32,
-                        child: ListView.builder(
-                          padding: EdgeInsets.zero,
-                          itemCount: options.length,
-                          shrinkWrap: true,
-                          itemBuilder: (BuildContext context, int index) {
-                            final String option = options.elementAt(index);
-                            return InkWell(
-                              onTap: () => onSelected(option),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text(option),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedStatus,
+                decoration: const InputDecoration(labelText: 'Status Detalhado'),
+                items: _opcoesStatus.map((String status) {
+                  return DropdownMenuItem<String>(
+                    value: status,
+                    child: Text(status),
                   );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedStatus = newValue;
+                    });
+                  }
                 },
               ),
               const SizedBox(height: 32),

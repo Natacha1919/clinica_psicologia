@@ -1,9 +1,10 @@
 // lib/features/pacientes/screens/lista_pacientes_screen.dart
 
+import 'package:clinica_psicologi/features/pacientes/models/prontuario_model.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/prontuario_model.dart'; 
+import '../models/paciente_detalhado_model.dart';
 import 'detalhes_paciente_screen.dart'; 
 
 class ListaPacientesScreen extends StatefulWidget {
@@ -21,7 +22,6 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
   List<PacienteHistorico> _pacientesOriginais = [];
   List<PacienteHistorico> _pacientesFiltrados = [];
 
-  // Mapeia o texto do dropdown para o parâmetro da função RPC
   final Map<String, String> _sortOptions = {
     'Nº Inscrição (Recentes)': 'numero_recente',
     'Ativos e Recentes': 'ativos_recentes',
@@ -48,7 +48,6 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
     if (mounted) setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
-      // MUDANÇA PRINCIPAL: Chamando a função RPC 'get_pacientes_sorted'
       final response = await Supabase.instance.client.rpc(
         'get_pacientes_sorted',
         params: {'sort_by': _sortOptions[_selectedSortOption]},
@@ -83,12 +82,8 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
     });
   }
 
-  Color _getStatusColor(String status) {
-    final statusUpper = status.toUpperCase();
-    if (statusUpper.contains('ATIVO')) return const Color(0xFF28A745);
-    if (statusUpper.contains('ENCERRADO')) return const Color(0xFFDC3545);
-    if (statusUpper.contains('ESPERA')) return const Color(0xFFFFC107);
-    return const Color(0xFF6C757D);
+  Color _getStatusColor(bool isAtivo) {
+    return isAtivo ? const Color(0xFF28A745) : const Color(0xFF6C757D);
   }
 
   @override
@@ -199,7 +194,9 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
   }
   
   Widget _buildPacienteCard(PacienteHistorico paciente) {
-    final statusColor = _getStatusColor(paciente.status);
+    final bool isAtivo = paciente.isAtivo;
+    final statusColor = _getStatusColor(isAtivo);
+    final statusTextGeral = isAtivo ? 'EM ATENDIMENTO' : 'ENCERRADO';
 
     return Card(
       elevation: 2,
@@ -240,7 +237,6 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // MUDANÇA: Exibindo o N° de Inscrição
                   Text(
                     'Nº Inscrição: ${paciente.nDeInscricao ?? 'N/A'} • CPF: ${paciente.cpf ?? 'Não consta'}',
                     style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
@@ -253,7 +249,7 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      paciente.status.toUpperCase(),
+                      statusTextGeral,
                       style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.bold,

@@ -1,8 +1,10 @@
-import 'package:clinica_psicologi/features/pacientes/screens/editar_paciente_screen.dart';
+// lib/features/pacientes/screens/detalhes_paciente_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/paciente_detalhado_model.dart';
+import 'editar_paciente_screen.dart';
 
 class DetalhesPacienteScreen extends StatefulWidget {
   final String pacienteId;
@@ -13,7 +15,7 @@ class DetalhesPacienteScreen extends StatefulWidget {
 }
 
 class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with SingleTickerProviderStateMixin {
-  late final Future<PacienteDetalhado?> _futurePaciente;
+  late Future<PacienteDetalhado?> _futurePaciente;
   late TabController _tabController;
 
   @override
@@ -21,14 +23,9 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     super.initState();
     _futurePaciente = _getPacienteDetalhado();
     _tabController = TabController(length: 4, vsync: this);
-
-    // ADIÇÃO CRUCIAL: Este listener garante que a tela seja reconstruída ao trocar de aba.
-    // Sem ele, o conteúdo não muda.
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
-        setState(() {
-          // Apenas chama setState para forçar a reconstrução da UI
-        });
+        setState(() {});
       }
     });
   }
@@ -41,18 +38,21 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
 
   Future<PacienteDetalhado?> _getPacienteDetalhado() async {
     if (widget.pacienteId.isEmpty) {
-      print('Erro de lógica: Tentativa de buscar paciente com ID vazio.');
       return null;
     }
-
     final supabase = Supabase.instance.client;
     try {
+      const selectColumns = 
+        'id, inscrito_id, nome_completo, cpf, status_detalhado, data_desligamento, '
+        'contato, endereco, data_nascimento, idade, sexo, genero, raca, '
+        'religiao, estado_civil, escolaridade, profissao, demanda_inicial, n_de_inscrição';
+
       final data = await supabase
           .from('pacientes_historico_temp')
-          .select()
+          .select(selectColumns)
           .eq('id', widget.pacienteId)
           .single();
-
+      
       return PacienteDetalhado.fromJson(data);
     } catch (e) {
       if (mounted) {
@@ -64,54 +64,60 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     }
   }
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: Colors.grey[50],
-    appBar: AppBar(
-      // ... (propriedades do AppBar)
-      actions: [
-        // O FutureBuilder aqui garante que o botão só apareça quando os dados do paciente estiverem carregados
-        FutureBuilder<PacienteDetalhado?>(
-          future: _futurePaciente,
-          builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data != null) {
-              final paciente = snapshot.data!;
-              return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: ElevatedButton.icon(
-                  // MUDANÇA AQUI: Adicionando a navegação
-                  onPressed: () async {
-                    // Navega para a tela de edição e espera um resultado
-                    final result = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditarPacienteScreen(paciente: paciente),
-                      ),
-                    );
-                    
-                    // Se o resultado for 'true' (salvo com sucesso), recarrega os dados
-                    if (result == true) {
-                      setState(() {
-                        _futurePaciente = _getPacienteDetalhado();
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text('Editar Informações'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00A28D),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              );
-            }
-            return const SizedBox.shrink(); // Não mostra o botão enquanto carrega
-          }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: Colors.grey[50],
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-      ],
-    ),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Perfil do Paciente', style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Informações completas e histórico', style: TextStyle(color: Colors.black54, fontSize: 12)),
+          ],
+        ),
+        actions: [
+          FutureBuilder<PacienteDetalhado?>(
+              future: _futurePaciente,
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data != null) {
+                  final paciente = snapshot.data!;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 16.0),
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditarPacienteScreen(paciente: paciente),
+                          ),
+                        );
+                        if (result == true) {
+                          setState(() {
+                            _futurePaciente = _getPacienteDetalhado();
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Editar Informações'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00A28D),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+        ],
+      ),
       body: FutureBuilder<PacienteDetalhado?>(
         future: _futurePaciente,
         builder: (context, snapshot) {
@@ -136,6 +142,7 @@ Widget build(BuildContext context) {
                   labelColor: Theme.of(context).colorScheme.primary,
                   unselectedLabelColor: Colors.grey[600],
                   indicatorColor: Theme.of(context).colorScheme.primary,
+                  isScrollable: true,
                   tabs: const [
                     Tab(text: 'Visão Geral'),
                     Tab(text: 'Consultas'),
@@ -148,7 +155,7 @@ Widget build(BuildContext context) {
                   _buildVisaoGeralTab(paciente),
                   _buildPlaceholderTab('Consultas'),
                   _buildPlaceholderTab('Financeiro'),
-                  _buildPlaceholderTab('Notas Clínicas'),
+                  _buildPlaceholderTab('Evolução Psicológica'),
                 ][_tabController.index],
               ],
             ),
@@ -189,8 +196,6 @@ Widget build(BuildContext context) {
                   'Demanda Inicial': paciente.demandaInicial,
                   'Alergias': null,
                   'Medicamentos em Uso': null,
-                  'Condições Anteriores': null,
-                  'Convênio': null,
                 },
               ),
             ),
@@ -302,18 +307,21 @@ Widget build(BuildContext context) {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        paciente.nomeCompleto,
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      Flexible(
+                        child: Text(
+                          paciente.nomeCompleto,
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Chip(
                         label: Text(
-                          paciente.status,
+                          paciente.statusDetalhado?.toUpperCase() ?? 'N/A',
                           style: const TextStyle(color: Colors.white, fontSize: 12),
                         ),
-                        backgroundColor: Colors.teal,
+                        backgroundColor: paciente.isAtivo ? Colors.teal : Colors.grey[600],
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                     ],
