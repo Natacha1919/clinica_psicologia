@@ -1,8 +1,10 @@
+// lib/features/triagem/models/paciente_model.dart
+
 class Paciente {
   final String id;
   final DateTime createdAt;
   final String? categoria;
-  final DateTime? dataHoraEnvio; // Aqui só a data
+  final DateTime? dataHoraEnvio;
   final String? telefone;
   final DateTime? dataNascimento;
   final String? idadeTexto;
@@ -25,6 +27,7 @@ class Paciente {
   final String? diasPreferenciais;
   final String? horariosPreferenciais;
   final String? poloEad;
+  final String? queixaPaciente; // ADICIONADO
 
   Paciente({
     required this.id,
@@ -53,12 +56,12 @@ class Paciente {
     this.diasPreferenciais,
     this.horariosPreferenciais,
     this.poloEad,
+    this.queixaPaciente, // ADICIONADO
   });
 
   factory Paciente.fromJson(Map<String, dynamic> json) {
     String? _safeGetString(dynamic value) => value?.toString();
 
-    // Converte string para DateTime (somente data)
     DateTime? _parseDate(String? dateString) {
       if (dateString == null) return null;
       try {
@@ -103,6 +106,7 @@ class Paciente {
       diasPreferenciais: _safeGetString(json['dias_preferenciais']),
       horariosPreferenciais: _safeGetString(json['horarios_preferenciais']),
       poloEad: _safeGetString(json['polo_ead']),
+      queixaPaciente: _safeGetString(json['queixa_paciente']), // ADICIONADO
     );
   }
 }

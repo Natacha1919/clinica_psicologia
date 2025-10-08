@@ -17,11 +17,7 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  static const List<String> _opcoesDemanda = [
-    'PSICODIAGNÓSTICO',
-    'PSICOTERAPIA',
-    'AVALIAÇÃO NEUROPSICOLÓGICA',
-  ];
+  final List<String> _opcoesTipoAtendimento = ['Orientação', 'Neuropsicologia', 'Psicanálise'];
   final List<String> _opcoesStatus = [
     'BR - AGUARDANDO ATENDIMENTO',
     'PG - AGUARDANDO ATENDIMENTO',
@@ -38,8 +34,9 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
   late final TextEditingController _cpfController;
   late final TextEditingController _telefoneController;
   late final TextEditingController _enderecoController;
-  late final TextEditingController _demandaInicialController;
+  late final TextEditingController _queixaPacienteController;
   late String _selectedStatus;
+  late String? _selectedTipoAtendimento;
 
   @override
   void initState() {
@@ -48,13 +45,18 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     _cpfController = TextEditingController(text: widget.paciente.cpf);
     _telefoneController = TextEditingController(text: widget.paciente.telefone);
     _enderecoController = TextEditingController(text: widget.paciente.endereco);
-    _demandaInicialController = TextEditingController(text: widget.paciente.demandaInicial);
+    _queixaPacienteController = TextEditingController(text: widget.paciente.queixaPaciente);
+    _selectedTipoAtendimento = widget.paciente.tipoAtendimento;
     
     final String? initialStatus = widget.paciente.statusDetalhado;
     if (initialStatus != null && _opcoesStatus.contains(initialStatus)) {
       _selectedStatus = initialStatus;
     } else {
-      _selectedStatus = _opcoesStatus.first;
+      // Tenta encontrar um status de 'aguardando' como um padrão mais inteligente
+      _selectedStatus = _opcoesStatus.firstWhere(
+        (s) => s.contains('AGUARDANDO'), 
+        orElse: () => _opcoesStatus.first
+      );
     }
   }
 
@@ -64,7 +66,7 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     _cpfController.dispose();
     _telefoneController.dispose();
     _enderecoController.dispose();
-    _demandaInicialController.dispose();
+    _queixaPacienteController.dispose();
     super.dispose();
   }
 
@@ -85,7 +87,8 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
         'cpf': _cpfController.text,
         'contato': _telefoneController.text,
         'endereco': _enderecoController.text,
-        'demanda_inicial': _demandaInicialController.text,
+        'queixa_paciente': _queixaPacienteController.text,
+        'tipo_atendimento': _selectedTipoAtendimento,
         'status_detalhado': _selectedStatus,
         'data_desligamento': isEncerrado ? DateTime.now().toIso8601String() : null,
       };
@@ -148,30 +151,27 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
                 decoration: const InputDecoration(labelText: 'Endereço'),
               ),
               const SizedBox(height: 16),
-              Autocomplete<String>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  if (textEditingValue.text.isEmpty) {
-                    return _opcoesDemanda;
-                  }
-                  return _opcoesDemanda.where((String option) {
-                    return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                  });
-                },
-                fieldViewBuilder: (BuildContext context, TextEditingController fieldController,
-                    FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    fieldController.text = _demandaInicialController.text;
-                  });
-                  return TextFormField(
-                    controller: fieldController,
-                    focusNode: fieldFocusNode,
-                    decoration: const InputDecoration(labelText: 'Demanda Inicial'),
-                    onChanged: (text) => _demandaInicialController.text = text,
+              TextFormField(
+                controller: _queixaPacienteController,
+                decoration: const InputDecoration(labelText: 'Queixa do Paciente'),
+                maxLines: 3,
+                minLines: 1,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedTipoAtendimento,
+                decoration: const InputDecoration(labelText: 'Tipo de Atendimento (Preceptor)'),
+                hint: const Text('Selecione uma classificação'),
+                items: _opcoesTipoAtendimento.map((String tipo) {
+                  return DropdownMenuItem<String>(
+                    value: tipo,
+                    child: Text(tipo),
                   );
-                },
-                onSelected: (String selection) {
-                  _demandaInicialController.text = selection;
-                   FocusScope.of(context).unfocus();
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedTipoAtendimento = newValue;
+                  });
                 },
               ),
               const SizedBox(height: 16),

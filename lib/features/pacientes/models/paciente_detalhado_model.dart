@@ -1,11 +1,8 @@
-// lib/features/pacientes/models/paciente_detalhado_model.dart
-
 import 'package:flutter/foundation.dart';
 
 DateTime? parseBrDate(String? dateString) {
   if (dateString == null || dateString.isEmpty) return null;
   try {
-    // Tenta diferentes formatos, incluindo o padrão ISO que o Supabase pode retornar
     if (dateString.contains('-') && dateString.length > 10) {
       return DateTime.tryParse(dateString);
     }
@@ -24,7 +21,6 @@ DateTime? parseBrDate(String? dateString) {
   return null;
 }
 
-// --- Modelo Detalhado para a tela de detalhes e edição ---
 class PacienteDetalhado {
   final String id;
   final String inscritoId;
@@ -44,7 +40,8 @@ class PacienteDetalhado {
   final String? estadoCivil;
   final String? escolaridade;
   final String? profissao;
-  final String? demandaInicial;
+  final String? queixaPaciente;
+  final String? tipoAtendimento;
   final String? nDeInscricao;
 
   bool get isAtivo => dataDesligamento == null;
@@ -68,7 +65,8 @@ class PacienteDetalhado {
     this.estadoCivil,
     this.escolaridade,
     this.profissao,
-    this.demandaInicial,
+    this.queixaPaciente,
+    this.tipoAtendimento,
     this.nDeInscricao,
   });
 
@@ -83,7 +81,7 @@ class PacienteDetalhado {
       cpf: json['cpf'] as String?,
       statusDetalhado: json['status_detalhado'] as String?,
       dataDesligamento: parseBrDate(json['data_desligamento']?.toString()),
-      email: json['email'] as String?, // Assumindo que pode existir uma coluna email
+      email: json['email'] as String?,
       telefone: json['contato'] as String?,
       endereco: json['endereco'] as String?,
       dataNascimento: parseBrDate(json['data_nascimento']?.toString()),
@@ -95,7 +93,8 @@ class PacienteDetalhado {
       estadoCivil: json['estado_civil'] as String?,
       escolaridade: json['escolaridade'] as String?,
       profissao: json['profissao'] as String?,
-      demandaInicial: json['demanda_inicial'] as String?,
+      queixaPaciente: json['queixa_paciente'] as String?,
+      tipoAtendimento: json['tipo_atendimento'] as String?,
       nDeInscricao: json['n_de_inscrição'] as String?,
     );
   }

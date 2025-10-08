@@ -42,10 +42,11 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     }
     final supabase = Supabase.instance.client;
     try {
+      // ATUALIZADO: Selecionando as colunas renomeadas/novas
       const selectColumns = 
         'id, inscrito_id, nome_completo, cpf, status_detalhado, data_desligamento, '
         'contato, endereco, data_nascimento, idade, sexo, genero, raca, '
-        'religiao, estado_civil, escolaridade, profissao, demanda_inicial, n_de_inscrição';
+        'religiao, estado_civil, escolaridade, profissao, queixa_paciente, tipo_atendimento, n_de_inscrição';
 
       final data = await supabase
           .from('pacientes_historico_temp')
@@ -155,7 +156,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                   _buildVisaoGeralTab(paciente),
                   _buildPlaceholderTab('Consultas'),
                   _buildPlaceholderTab('Financeiro'),
-                  _buildPlaceholderTab('Evolução Psicológica'),
+                  _buildPlaceholderTab('Notas Clínicas'),
                 ][_tabController.index],
               ],
             ),
@@ -176,10 +177,10 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                 icon: Icons.person_outline,
                 title: 'Informações Pessoais',
                 data: {
+                  'Tipo de Atendimento': paciente.tipoAtendimento,
                   'Data de Nascimento': paciente.dataNascimento != null ? DateFormat('dd/MM/yyyy').format(paciente.dataNascimento!) : null,
                   'Idade': paciente.idade != null ? '${paciente.idade} anos' : null,
                   'Estado Civil': paciente.estadoCivil,
-                  'Escolaridade': paciente.escolaridade,
                   'Profissão': paciente.profissao,
                   'Gênero': paciente.genero,
                   'Raça/Cor': paciente.raca,
@@ -193,9 +194,9 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                 icon: Icons.favorite_border,
                 title: 'Informações de Saúde',
                 data: {
-                  'Demanda Inicial': paciente.demandaInicial,
-                  'Alergias': null,
-                  'Medicamentos em Uso': null,
+                  'Queixa do Paciente': paciente.queixaPaciente,
+                  'Alergias': null, // Exemplo
+                  'Medicamentos em Uso': null, // Exemplo
                 },
               ),
             ),
