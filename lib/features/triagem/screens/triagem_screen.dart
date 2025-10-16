@@ -17,11 +17,9 @@ class TriagemScreen extends StatefulWidget {
 class _TriagemScreenState extends State<TriagemScreen> {
   final Color _primaryDark = const Color(0xFF122640);
   final Color _accentGreen = const Color(0xFF36D97D);
-
   final _searchController = TextEditingController();
   bool _isLoading = true;
   String? _errorMessage;
-
   List<Paciente> _pacientesOriginais = [];
   List<Paciente> _pacientesFiltrados = [];
 
@@ -48,17 +46,26 @@ class _TriagemScreenState extends State<TriagemScreen> {
     }
 
     try {
+      // CORRIGIDO: Lista de colunas 100% atualizada
+      const selectColumns =
+          'id, created_at, categoria, data_hora_envio, telefone, data_nascimento, '
+          'idade_texto, nome_completo, termo_consentimento, nome_social, cpf, '
+          'nome_pai, nome_mae, estado_civil, religiao, endereco, encaminhamento, '
+          'vinculo_unifecaf_status, vinculo_unifecaf_detalhe, email, renda_mensal, '
+          'email_secundario, modalidade_preferencial, dias_preferenciais, '
+          'horarios_preferenciais, polo_ead, tipo_atendimento, '
+          'historico_saude_mental, uso_medicacao, queixa_triagem, tratamento_saude, '
+          'rotina_paciente, triagem_realizada_por, dia_atendimento_definido, '
+          'sexo, raca, escolaridade, profissao, escolaridade_pai, profissao_pai, '
+          'escolaridade_mae, profissao_mae, prioridade_atendimento';
+
       final response = await SupabaseConfig.client
           .from('pacientes_inscritos')
-          .select()
-          // GARANTINDO A ORDEM CORRETA: mais novos primeiro
+          .select(selectColumns)
           .order('data_hora_envio', ascending: false);
-
+          
       final dataList = List<Map<String, dynamic>>.from(response);
-
-      final pacientes = dataList.map((json) {
-        return Paciente.fromJson(json);
-      }).toList();
+      final pacientes = dataList.map((json) => Paciente.fromJson(json)).toList();
 
       if (mounted) {
         setState(() {
@@ -91,13 +98,7 @@ class _TriagemScreenState extends State<TriagemScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.person_search_outlined),
-            SizedBox(width: 10),
-            Text('Pacientes Inscritos'),
-          ],
-        ),
+        title: const Row(children: [Icon(Icons.person_search_outlined), SizedBox(width: 10), Text('Pacientes Inscritos')]),
         elevation: 2,
       ),
       body: Column(
@@ -123,14 +124,7 @@ class _TriagemScreenState extends State<TriagemScreen> {
               hintText: 'Pesquisar por nome...',
               prefixIcon: Icon(Icons.search, color: _primaryDark),
               border: InputBorder.none,
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
-                  : null,
+              suffixIcon: _searchController.text.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () => _searchController.clear()) : null,
             ),
           ),
         ),
@@ -143,17 +137,11 @@ class _TriagemScreenState extends State<TriagemScreen> {
       return Center(child: CircularProgressIndicator(color: _accentGreen));
     }
     if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(_errorMessage!, textAlign: TextAlign.center),
-        ),
-      );
+      return Center(child: Padding(padding: const EdgeInsets.all(16.0), child: Text(_errorMessage!, textAlign: TextAlign.center)));
     }
     if (_pacientesFiltrados.isEmpty) {
       return const Center(child: Text('Nenhum paciente encontrado.'));
     }
-
     return RefreshIndicator(
       onRefresh: _carregarDados,
       color: _accentGreen,
@@ -170,25 +158,19 @@ class _TriagemScreenState extends State<TriagemScreen> {
   
   Widget _buildPacienteCard(Paciente paciente) {
     final status = StatusPaciente.values.firstWhere(
-      (e) => e.valor == (paciente.categoria?.toUpperCase() ?? 'ESPERA'),
+      (e) => e.valor.toUpperCase() == (paciente.categoria?.toUpperCase() ?? 'ESPERA'),
       orElse: () => StatusPaciente.espera,
     );
 
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           Navigator.of(context)
-              .push(
-                MaterialPageRoute(
-                  builder: (context) => DetalhesPacienteScreen(paciente: paciente),
-                ),
-              )
+              .push(MaterialPageRoute(builder: (context) => DetalhesPacienteScreen(pacienteId: paciente.id)))
               .then((_) => _carregarDados());
         },
         child: Row(
@@ -196,13 +178,7 @@ class _TriagemScreenState extends State<TriagemScreen> {
             Container(
               width: 8,
               height: 100,
-              decoration: BoxDecoration(
-                color: status.cor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                ),
-              ),
+              decoration: BoxDecoration(color: status.cor, borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12))),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -210,45 +186,20 @@ class _TriagemScreenState extends State<TriagemScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    paciente.nomeCompleto,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: _primaryDark,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(paciente.nomeCompleto, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _primaryDark), maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
-                  Text(
-                    'CPF: ${paciente.cpf ?? 'Não informado'}',
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                  ),
+                  Text('CPF: ${paciente.cpf ?? 'Não informado'}', style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: status.cor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          status.valor,
-                          style: TextStyle(
-                            color: status.cor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
+                        decoration: BoxDecoration(color: status.cor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                        child: Text(status.valor, style: TextStyle(color: status.cor, fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                       const Spacer(),
                       if (paciente.dataHoraEnvio != null)
-                        Text(
-                          DateFormat('dd/MM/yyyy').format(paciente.dataHoraEnvio!),
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                        ),
+                        Text(DateFormat('dd/MM/yyyy').format(paciente.dataHoraEnvio!), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                     ],
                   ),
                 ],

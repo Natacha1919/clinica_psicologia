@@ -27,7 +27,25 @@ class Paciente {
   final String? diasPreferenciais;
   final String? horariosPreferenciais;
   final String? poloEad;
-  final String? queixaPaciente; // ADICIONADO
+  final String? tipoAtendimento; // NOME CORRETO
+  
+  // Campos da triagem
+  final String? historicoSaudeMental;
+  final String? usoMedicacao;
+  final String? queixaTriagem;
+  final String? tratamentoSaude;
+  final String? rotinaPaciente;
+  final String? triagemRealizadaPor;
+  final String? diaAtendimentoDefinido;
+  final String? sexo;
+  final String? raca;
+  final String? escolaridade;
+  final String? profissao;
+  final String? escolaridadePai;
+  final String? profissaoPai;
+  final String? escolaridadeMae;
+  final String? profissaoMae;
+  final String? prioridadeAtendimento;
 
   Paciente({
     required this.id,
@@ -56,12 +74,27 @@ class Paciente {
     this.diasPreferenciais,
     this.horariosPreferenciais,
     this.poloEad,
-    this.queixaPaciente, // ADICIONADO
+    this.tipoAtendimento, // NOME CORRETO
+    this.historicoSaudeMental,
+    this.usoMedicacao,
+    this.queixaTriagem,
+    this.tratamentoSaude,
+    this.rotinaPaciente,
+    this.triagemRealizadaPor,
+    this.diaAtendimentoDefinido,
+    this.sexo,
+    this.raca,
+    this.escolaridade,
+    this.profissao,
+    this.escolaridadePai,
+    this.profissaoPai,
+    this.escolaridadeMae,
+    this.profissaoMae,
+    this.prioridadeAtendimento,
   });
 
   factory Paciente.fromJson(Map<String, dynamic> json) {
     String? _safeGetString(dynamic value) => value?.toString();
-
     DateTime? _parseDate(String? dateString) {
       if (dateString == null) return null;
       try {
@@ -70,7 +103,6 @@ class Paciente {
         return null;
       }
     }
-
     String? categoriaFinal;
     final dynamic categoriaData = json['categoria'];
     if (categoriaData != null && categoriaData is Map) {
@@ -106,7 +138,24 @@ class Paciente {
       diasPreferenciais: _safeGetString(json['dias_preferenciais']),
       horariosPreferenciais: _safeGetString(json['horarios_preferenciais']),
       poloEad: _safeGetString(json['polo_ead']),
-      queixaPaciente: _safeGetString(json['queixa_paciente']), // ADICIONADO
+      tipoAtendimento: _safeGetString(json['tipo_atendimento']), // CORRIGIDO
+      historicoSaudeMental: _safeGetString(json['historico_saude_mental']),
+      usoMedicacao: _safeGetString(json['uso_medicacao']),
+      queixaTriagem: _safeGetString(json['queixa_triagem']),
+      tratamentoSaude: _safeGetString(json['tratamento_saude']),
+      rotinaPaciente: _safeGetString(json['rotina_paciente']),
+      triagemRealizadaPor: _safeGetString(json['triagem_realizada_por']),
+      diaAtendimentoDefinido: _safeGetString(json['dia_atendimento_definido']),
+      sexo: _safeGetString(json['sexo']),
+      raca: _safeGetString(json['raca']),
+      escolaridade: _safeGetString(json['escolaridade']),
+      profissao: _safeGetString(json['profissao']),
+      escolaridadePai: _safeGetString(json['escolaridade_pai']),
+      profissaoPai: _safeGetString(json['profissao_pai']),
+      escolaridadeMae: _safeGetString(json['escolaridade_mae']),
+      profissaoMae: _safeGetString(json['profissao_mae']),
+      prioridadeAtendimento: _safeGetString(json['prioridade_atendimento']),
+      
     );
   }
 }

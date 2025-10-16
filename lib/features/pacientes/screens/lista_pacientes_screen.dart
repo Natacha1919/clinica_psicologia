@@ -4,7 +4,7 @@ import 'package:clinica_psicologi/features/pacientes/models/prontuario_model.dar
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/paciente_detalhado_model.dart';
+import '../models/paciente_detalhado_model.dart' as detalhado;
 import 'detalhes_paciente_screen.dart'; 
 
 class ListaPacientesScreen extends StatefulWidget {
@@ -19,8 +19,8 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
   bool _isLoading = true;
   String? _errorMessage;
 
-  List<PacienteHistorico> _pacientesOriginais = [];
-  List<PacienteHistorico> _pacientesFiltrados = [];
+  List<detalhado.PacienteHistorico> _pacientesOriginais = [];
+  List<detalhado.PacienteHistorico> _pacientesFiltrados = [];
 
   final Map<String, String> _sortOptions = {
     'Nº Inscrição (Recentes)': 'numero_recente',
@@ -54,7 +54,7 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
       );
 
       final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(response);
-      final List<PacienteHistorico> pacientes = data.map((json) => PacienteHistorico.fromJson(json)).toList();
+      final List<detalhado.PacienteHistorico> pacientes = data.map((json) => detalhado.PacienteHistorico.fromJson(json)).toList();
 
       if (mounted) {
         setState(() {
@@ -193,7 +193,7 @@ class _ListaPacientesScreenState extends State<ListaPacientesScreen> {
     );
   }
   
-  Widget _buildPacienteCard(PacienteHistorico paciente) {
+  Widget _buildPacienteCard(detalhado.PacienteHistorico paciente) {
     final bool isAtivo = paciente.isAtivo;
     final statusColor = _getStatusColor(isAtivo);
     final statusTextGeral = isAtivo ? 'EM ATENDIMENTO' : 'ENCERRADO';

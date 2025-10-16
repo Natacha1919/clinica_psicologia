@@ -1,5 +1,3 @@
-// lib/features/pacientes/screens/detalhes_paciente_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -42,18 +40,21 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     }
     final supabase = Supabase.instance.client;
     try {
-      // ATUALIZADO: Selecionando as colunas renomeadas/novas
-      const selectColumns = 
-        'id, inscrito_id, nome_completo, cpf, status_detalhado, data_desligamento, '
-        'contato, endereco, data_nascimento, idade, sexo, genero, raca, '
-        'religiao, estado_civil, escolaridade, profissao, queixa_paciente, tipo_atendimento, n_de_inscrição';
+      // ===== CORREÇÃO DEFINITIVA AQUI =====
+      // A lista de colunas agora inclui TODOS os campos necessários para o perfil.
+      const selectColumns =
+          'id, inscrito_id, nome_completo, cpf, status_detalhado, data_desligamento, '
+          'contato, endereco, data_nascimento, idade, sexo, genero, raca, '
+          'religiao, estado_civil, escolaridade, profissao, tipo_atendimento, n_de_inscrição, email, '
+          'historico_saude_mental, uso_medicacao, queixa_triagem, tratamento_saude, rotina_paciente, triagem_realizada_por, dia_atendimento_definido, '
+          'escolaridade_pai, profissao_pai, escolaridade_mae, profissao_mae, prioridade_atendimento';
 
       final data = await supabase
           .from('pacientes_historico_temp')
           .select(selectColumns)
           .eq('id', widget.pacienteId)
           .single();
-      
+
       return PacienteDetalhado.fromJson(data);
     } catch (e) {
       if (mounted) {
@@ -177,13 +178,15 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                 icon: Icons.person_outline,
                 title: 'Informações Pessoais',
                 data: {
-                  'Tipo de Atendimento': paciente.tipoAtendimento,
+                  'CPF': paciente.cpf,
+                  'Email': paciente.email,
+                  'Telefone': paciente.telefone,
                   'Data de Nascimento': paciente.dataNascimento != null ? DateFormat('dd/MM/yyyy').format(paciente.dataNascimento!) : null,
-                  'Idade': paciente.idade != null ? '${paciente.idade} anos' : null,
+                  'Idade': paciente.idade,
                   'Estado Civil': paciente.estadoCivil,
                   'Profissão': paciente.profissao,
                   'Gênero': paciente.genero,
-                  'Raça/Cor': paciente.raca,
+                  'Raça': paciente.raca,
                   'Religião': paciente.religiao,
                 },
               ),
@@ -192,11 +195,16 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
             Expanded(
               child: _buildInfoCard(
                 icon: Icons.favorite_border,
-                title: 'Informações de Saúde',
+                title: 'Informações de Saúde e Triagem',
                 data: {
-                  'Queixa do Paciente': paciente.queixaPaciente,
-                  'Alergias': null, // Exemplo
-                  'Medicamentos em Uso': null, // Exemplo
+                  'Atendimento Escolhido (Paciente)': paciente.tipoAtendimento,
+                  'Queixa (Resumo da Triagem)': paciente.queixaTriagem,
+                  'Atendimento de Saúde Mental Anterior': paciente.historicoSaudeMental,
+                  'Uso de Medicação': paciente.usoMedicacao,
+                  'Tratamento de Saúde Atual': paciente.tratamentoSaude,
+                  'Rotina do Paciente': paciente.rotinaPaciente,
+                  'Triagem Realizada Por': paciente.triagemRealizadaPor,
+                  'Dia de Atendimento Definido': paciente.diaAtendimentoDefinido,
                 },
               ),
             ),

@@ -1,11 +1,16 @@
+// lib/features/pacientes/models/paciente_detalhado_model.dart
+
 import 'package:flutter/foundation.dart';
 
-DateTime? parseBrDate(String? dateString) {
+DateTime? parseDate(String? dateString) {
   if (dateString == null || dateString.isEmpty) return null;
+  
+  DateTime? parsedDate = DateTime.tryParse(dateString);
+  if (parsedDate != null) {
+    return parsedDate;
+  }
+
   try {
-    if (dateString.contains('-') && dateString.length > 10) {
-      return DateTime.tryParse(dateString);
-    }
     final parts = dateString.split('/');
     if (parts.length == 3) {
       final day = int.parse(parts[0]);
@@ -15,15 +20,16 @@ DateTime? parseBrDate(String? dateString) {
     }
   } catch (e) {
     if (kDebugMode) {
-      print('Erro ao converter data: $dateString');
+      print('Erro ao converter data no formato brasileiro: $dateString');
     }
   }
+  
   return null;
 }
 
 class PacienteDetalhado {
   final String id;
-  final String inscritoId;
+  final String? inscritoId;
   final String nomeCompleto;
   final String? cpf;
   final String? statusDetalhado;
@@ -40,15 +46,26 @@ class PacienteDetalhado {
   final String? estadoCivil;
   final String? escolaridade;
   final String? profissao;
-  final String? queixaPaciente;
   final String? tipoAtendimento;
   final String? nDeInscricao;
+  final String? historicoSaudeMental;
+  final String? usoMedicacao;
+  final String? queixaTriagem;
+  final String? tratamentoSaude;
+  final String? rotinaPaciente;
+  final String? triagemRealizadaPor;
+  final String? diaAtendimentoDefinido;
+  final String? escolaridadePai;
+  final String? profissaoPai;
+  final String? escolaridadeMae;
+  final String? profissaoMae;
+  final String? prioridadeAtendimento;
 
   bool get isAtivo => dataDesligamento == null;
 
   PacienteDetalhado({
     required this.id,
-    required this.inscritoId,
+    this.inscritoId,
     required this.nomeCompleto,
     this.cpf,
     this.statusDetalhado,
@@ -65,9 +82,20 @@ class PacienteDetalhado {
     this.estadoCivil,
     this.escolaridade,
     this.profissao,
-    this.queixaPaciente,
     this.tipoAtendimento,
     this.nDeInscricao,
+    this.historicoSaudeMental,
+    this.usoMedicacao,
+    this.queixaTriagem,
+    this.tratamentoSaude,
+    this.rotinaPaciente,
+    this.triagemRealizadaPor,
+    this.diaAtendimentoDefinido,
+    this.escolaridadePai,
+    this.profissaoPai,
+    this.escolaridadeMae,
+    this.profissaoMae,
+    this.prioridadeAtendimento,
   });
 
   factory PacienteDetalhado.fromJson(Map<String, dynamic> json) {
@@ -76,15 +104,18 @@ class PacienteDetalhado {
     }
     return PacienteDetalhado(
       id: json['id'] as String,
-      inscritoId: json['inscrito_id'] as String? ?? '',
+      inscritoId: json['inscrito_id'] as String?,
       nomeCompleto: json['nome_completo'] as String? ?? 'Nome não informado',
       cpf: json['cpf'] as String?,
       statusDetalhado: json['status_detalhado'] as String?,
-      dataDesligamento: parseBrDate(json['data_desligamento']?.toString()),
-      email: json['email'] as String?,
+      dataDesligamento: parseDate(json['data_desligamento'] as String?),
+      
+      // ===== CORREÇÃO DEFINITIVA AQUI =====
+      email: json['email'] as String?, // Lendo da coluna correta 'email'
+      
       telefone: json['contato'] as String?,
       endereco: json['endereco'] as String?,
-      dataNascimento: parseBrDate(json['data_nascimento']?.toString()),
+      dataNascimento: parseDate(json['data_nascimento'] as String?),
       idade: json['idade'] as String?,
       sexo: json['sexo'] as String?,
       genero: json['genero'] as String?,
@@ -93,8 +124,69 @@ class PacienteDetalhado {
       estadoCivil: json['estado_civil'] as String?,
       escolaridade: json['escolaridade'] as String?,
       profissao: json['profissao'] as String?,
-      queixaPaciente: json['queixa_paciente'] as String?,
       tipoAtendimento: json['tipo_atendimento'] as String?,
+      nDeInscricao: json['n_de_inscrição'] as String?,
+      historicoSaudeMental: json['historico_saude_mental'] as String?,
+      usoMedicacao: json['uso_medicacao'] as String?,
+      queixaTriagem: json['queixa_triagem'] as String?,
+      tratamentoSaude: json['tratamento_saude'] as String?,
+      rotinaPaciente: json['rotina_paciente'] as String?,
+      triagemRealizadaPor: json['triagem_realizada_por'] as String?,
+      diaAtendimentoDefinido: json['dia_atendimento_definido'] as String?,
+      escolaridadePai: json['escolaridade_pai'] as String?,
+      profissaoPai: json['profissao_pai'] as String?,
+      escolaridadeMae: json['escolaridade_mae'] as String?,
+      profissaoMae: json['profissao_mae'] as String?,
+      prioridadeAtendimento: json['prioridade_atendimento'] as String?,
+    );
+  }
+
+  String get iniciais {
+    if (nomeCompleto.isEmpty) return '?';
+    final parts = nomeCompleto.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.length > 1) {
+      return (parts.first[0] + parts.last[0]).toUpperCase();
+    } else if (parts.isNotEmpty && parts.first.length >= 2) {
+      return parts.first.substring(0, 2).toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts.first[0].toUpperCase();
+    }
+    return '?';
+  }
+}
+
+class PacienteHistorico {
+  final String id;
+  final String nomeCompleto;
+  final String? cpf;
+  final String? statusDetalhado;
+  final DateTime? dataDesligamento;
+  final DateTime? dataInscricao;
+  final String? nDeInscricao;
+
+  bool get isAtivo => dataDesligamento == null;
+
+  PacienteHistorico({
+    required this.id,
+    required this.nomeCompleto,
+    this.cpf,
+    this.statusDetalhado,
+    this.dataDesligamento,
+    this.dataInscricao,
+    this.nDeInscricao,
+  });
+
+  factory PacienteHistorico.fromJson(Map<String, dynamic> json) {
+    if (json['id'] == null) {
+      throw ArgumentError("O ID do paciente não pode ser nulo.");
+    }
+    return PacienteHistorico(
+      id: json['id'] as String,
+      nomeCompleto: json['nome_completo'] as String? ?? 'Nome não informado',
+      cpf: json['cpf'] as String?,
+      statusDetalhado: json['status_detalhado'] as String?,
+      dataDesligamento: parseDate(json['data_desligamento'] as String?),
+      dataInscricao: parseDate(json['data_inscricao'] as String?),
       nDeInscricao: json['n_de_inscrição'] as String?,
     );
   }

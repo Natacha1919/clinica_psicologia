@@ -17,7 +17,6 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  final List<String> _opcoesTipoAtendimento = ['Orientação', 'Neuropsicologia', 'Psicanálise'];
   final List<String> _opcoesStatus = [
     'BR - AGUARDANDO ATENDIMENTO',
     'PG - AGUARDANDO ATENDIMENTO',
@@ -34,9 +33,7 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
   late final TextEditingController _cpfController;
   late final TextEditingController _telefoneController;
   late final TextEditingController _enderecoController;
-  late final TextEditingController _queixaPacienteController;
   late String _selectedStatus;
-  late String? _selectedTipoAtendimento;
 
   @override
   void initState() {
@@ -45,14 +42,11 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     _cpfController = TextEditingController(text: widget.paciente.cpf);
     _telefoneController = TextEditingController(text: widget.paciente.telefone);
     _enderecoController = TextEditingController(text: widget.paciente.endereco);
-    _queixaPacienteController = TextEditingController(text: widget.paciente.queixaPaciente);
-    _selectedTipoAtendimento = widget.paciente.tipoAtendimento;
     
     final String? initialStatus = widget.paciente.statusDetalhado;
     if (initialStatus != null && _opcoesStatus.contains(initialStatus)) {
       _selectedStatus = initialStatus;
     } else {
-      // Tenta encontrar um status de 'aguardando' como um padrão mais inteligente
       _selectedStatus = _opcoesStatus.firstWhere(
         (s) => s.contains('AGUARDANDO'), 
         orElse: () => _opcoesStatus.first
@@ -66,7 +60,6 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     _cpfController.dispose();
     _telefoneController.dispose();
     _enderecoController.dispose();
-    _queixaPacienteController.dispose();
     super.dispose();
   }
 
@@ -87,8 +80,6 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
         'cpf': _cpfController.text,
         'contato': _telefoneController.text,
         'endereco': _enderecoController.text,
-        'queixa_paciente': _queixaPacienteController.text,
-        'tipo_atendimento': _selectedTipoAtendimento,
         'status_detalhado': _selectedStatus,
         'data_desligamento': isEncerrado ? DateTime.now().toIso8601String() : null,
       };
@@ -151,30 +142,7 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
                 decoration: const InputDecoration(labelText: 'Endereço'),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _queixaPacienteController,
-                decoration: const InputDecoration(labelText: 'Queixa do Paciente'),
-                maxLines: 3,
-                minLines: 1,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedTipoAtendimento,
-                decoration: const InputDecoration(labelText: 'Tipo de Atendimento (Preceptor)'),
-                hint: const Text('Selecione uma classificação'),
-                items: _opcoesTipoAtendimento.map((String tipo) {
-                  return DropdownMenuItem<String>(
-                    value: tipo,
-                    child: Text(tipo),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedTipoAtendimento = newValue;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
+              
               DropdownButtonFormField<String>(
                 value: _selectedStatus,
                 decoration: const InputDecoration(labelText: 'Status Detalhado'),

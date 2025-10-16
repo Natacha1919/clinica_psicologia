@@ -1,4 +1,3 @@
-import 'package:clinica_psicologi/features/pacientes/models/paciente_detalhado_model.dart';
 
 class PacienteHistorico {
   final String id;
@@ -48,4 +47,35 @@ class PacienteHistorico {
     }
     return '?';
   }
+}
+
+DateTime? parseBrDate(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+
+  // Try ISO 8601 first
+  try {
+    return DateTime.parse(value);
+  } catch (_) {}
+
+  // Try Brazilian format dd/MM/yyyy or dd/MM/yyyy HH:mm:ss
+  final parts = value.split(' ');
+  final datePart = parts.first;
+  final dateSegments = datePart.split('/');
+  if (dateSegments.length == 3) {
+    final day = int.tryParse(dateSegments[0]);
+    final month = int.tryParse(dateSegments[1]);
+    final year = int.tryParse(dateSegments[2]);
+    if (day != null && month != null && year != null) {
+      int hour = 0, minute = 0, second = 0;
+      if (parts.length > 1) {
+        final timeSegments = parts[1].split(':');
+        hour = int.tryParse(timeSegments.elementAt(0)) ?? 0;
+        minute = int.tryParse(timeSegments.elementAt(1)) ?? 0;
+        second = int.tryParse(timeSegments.elementAt(2)) ?? 0;
+      }
+      return DateTime(year, month, day, hour, minute, second);
+    }
+  }
+
+  return null;
 }
