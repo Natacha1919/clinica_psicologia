@@ -40,14 +40,14 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     }
     final supabase = Supabase.instance.client;
     try {
-      // ===== CORREÇÃO DEFINITIVA AQUI =====
-      // A lista de colunas agora inclui TODOS os campos necessários para o perfil.
+      // ===== ADIÇÃO SOLICITADA 1 =====
+      // Adicionada a coluna 'classificacao_preceptor' ao final da string.
       const selectColumns =
           'id, inscrito_id, nome_completo, cpf, status_detalhado, data_desligamento, '
           'contato, endereco, data_nascimento, idade, sexo, genero, raca, '
           'religiao, estado_civil, escolaridade, profissao, tipo_atendimento, n_de_inscrição, email, '
           'historico_saude_mental, uso_medicacao, queixa_triagem, tratamento_saude, rotina_paciente, triagem_realizada_por, dia_atendimento_definido, '
-          'escolaridade_pai, profissao_pai, escolaridade_mae, profissao_mae, prioridade_atendimento';
+          'escolaridade_pai, profissao_pai, escolaridade_mae, profissao_mae, prioridade_atendimento, classificacao_preceptor'; // <-- ADICIONADO AQUI
 
       final data = await supabase
           .from('pacientes_historico_temp')
@@ -198,6 +198,8 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                 title: 'Informações de Saúde e Triagem',
                 data: {
                   'Atendimento Escolhido (Paciente)': paciente.tipoAtendimento,
+                  // ===== ADIÇÃO SOLICITADA 2 =====
+                  'Classificação (Preceptor)': paciente.classificacaoPreceptor,
                   'Queixa (Resumo da Triagem)': paciente.queixaTriagem,
                   'Atendimento de Saúde Mental Anterior': paciente.historicoSaudeMental,
                   'Uso de Medicação': paciente.usoMedicacao,

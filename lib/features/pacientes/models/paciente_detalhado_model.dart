@@ -1,15 +1,10 @@
 // lib/features/pacientes/models/paciente_detalhado_model.dart
-
 import 'package:flutter/foundation.dart';
 
 DateTime? parseDate(String? dateString) {
   if (dateString == null || dateString.isEmpty) return null;
-  
   DateTime? parsedDate = DateTime.tryParse(dateString);
-  if (parsedDate != null) {
-    return parsedDate;
-  }
-
+  if (parsedDate != null) return parsedDate;
   try {
     final parts = dateString.split('/');
     if (parts.length == 3) {
@@ -19,11 +14,8 @@ DateTime? parseDate(String? dateString) {
       return DateTime(year, month, day);
     }
   } catch (e) {
-    if (kDebugMode) {
-      print('Erro ao converter data no formato brasileiro: $dateString');
-    }
+    if (kDebugMode) print('Erro ao converter data no formato brasileiro: $dateString');
   }
-  
   return null;
 }
 
@@ -46,7 +38,8 @@ class PacienteDetalhado {
   final String? estadoCivil;
   final String? escolaridade;
   final String? profissao;
-  final String? tipoAtendimento;
+  final String? tipoAtendimento; // Escolha do Paciente
+  final String? classificacaoPreceptor; // ESCOLHA DO PRECEPTOR
   final String? nDeInscricao;
   final String? historicoSaudeMental;
   final String? usoMedicacao;
@@ -83,6 +76,7 @@ class PacienteDetalhado {
     this.escolaridade,
     this.profissao,
     this.tipoAtendimento,
+    this.classificacaoPreceptor, // CORRIGIDO
     this.nDeInscricao,
     this.historicoSaudeMental,
     this.usoMedicacao,
@@ -109,10 +103,7 @@ class PacienteDetalhado {
       cpf: json['cpf'] as String?,
       statusDetalhado: json['status_detalhado'] as String?,
       dataDesligamento: parseDate(json['data_desligamento'] as String?),
-      
-      // ===== CORREÇÃO DEFINITIVA AQUI =====
-      email: json['email'] as String?, // Lendo da coluna correta 'email'
-      
+      email: json['email'] as String?,
       telefone: json['contato'] as String?,
       endereco: json['endereco'] as String?,
       dataNascimento: parseDate(json['data_nascimento'] as String?),
@@ -125,6 +116,7 @@ class PacienteDetalhado {
       escolaridade: json['escolaridade'] as String?,
       profissao: json['profissao'] as String?,
       tipoAtendimento: json['tipo_atendimento'] as String?,
+      classificacaoPreceptor: json['classificacao_preceptor'] as String?, // CORRIGIDO
       nDeInscricao: json['n_de_inscrição'] as String?,
       historicoSaudeMental: json['historico_saude_mental'] as String?,
       usoMedicacao: json['uso_medicacao'] as String?,
