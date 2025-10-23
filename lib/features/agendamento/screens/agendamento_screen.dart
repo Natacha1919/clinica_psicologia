@@ -2,11 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Importante para 'pt_BR'
 import 'package:table_calendar/table_calendar.dart';
-import '../../../core/config/supabase_config.dart';
-import '../models/agendamento_model.dart';
-import '../models/sala_model.dart';
+import '../../../core/config/supabase_config.dart'; // Verifique se este caminho está correto
+import '../models/agendamento_model.dart'; // Verifique se este caminho está correto
+import '../models/sala_model.dart'; // Verifique se este caminho está correto
 
 class AgendamentoScreen extends StatefulWidget {
   const AgendamentoScreen({Key? key}) : super(key: key);
@@ -30,6 +30,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   @override
   void initState() {
     super.initState();
+    // Inicializa a formatação de data para Português (Brasil)
     initializeDateFormatting('pt_BR');
     _fetchDataParaDia(_selectedDay);
   }
@@ -43,11 +44,15 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
           .select()
           .order('nome', ascending: true);
 
+      // Formata a data para o padrão 'yyyy-MM-dd' que o Supabase/PostgreSQL espera
+      final dataFormatada = DateFormat('yyyy-MM-dd').format(dia);
+
       final agendamentosResponse = await SupabaseConfig.client.rpc(
         'get_agendamentos_para_dia',
-        params: {'p_target_date': DateFormat('yyyy-MM-dd').format(dia)},
+        params: {'p_target_date': dataFormatada},
       );
 
+      // Conversão segura dos dados
       final List<Map<String, dynamic>> salasData = List<Map<String, dynamic>>.from(salasResponse as List);
       final List<Map<String, dynamic>> agendamentosData = List<Map<String, dynamic>>.from(agendamentosResponse as List);
 
@@ -72,6 +77,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     DateTime? dataFimRecorrencia,
   }) async {
     final horaInicio = '${horario.hour.toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
+    // Assume que o agendamento dura 1 hora.
     final horaFim = '${(horario.hour + 1).toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
     final data = DateFormat('yyyy-MM-dd').format(_selectedDay);
 
@@ -92,15 +98,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
-  Future<void> _editarAgendamento(Agendamento agendamento, String novoTitulo) async {
-    try {
-      await SupabaseConfig.client.from('agendamentos').update({'titulo': novoTitulo}).eq('id', agendamento.id);
-      _showSnackBar('Agendamento atualizado com sucesso!');
-      await _fetchDataParaDia(_selectedDay);
-    } catch (e) {
-      _showSnackBar('Erro ao editar agendamento: $e', isError: true);
-    }
-  }
+  // A função _editarAgendamento foi removida pois não será mais usada.
 
   Future<void> _excluirAgendamento(String agendamentoId) async {
     final confirmed = await showDialog<bool>(
@@ -110,7 +108,11 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
         content: const Text('Você tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Excluir'), style: FilledButton.styleFrom(backgroundColor: Colors.red)),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Excluir'),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+          ),
         ],
       ),
     );
@@ -134,15 +136,20 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // MODERNO: Pegamos o tema aqui para usar nas personalizações
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF8F9FA), // Um fundo cinza claro, bom para web
       appBar: AppBar(
         title: const Text('Agendamento de Salas'),
         elevation: 1,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
       ),
       body: Column(
         children: [
-          _buildCalendar(),
+          _buildCalendar(theme), // Passa o tema para o calendário
           const Divider(height: 1),
           Expanded(
             child: _isLoading
@@ -151,7 +158,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                     ? Center(child: Text(_errorMessage!))
                     : RefreshIndicator(
                         onRefresh: () => _fetchDataParaDia(_selectedDay),
-                        child: _buildTimetable(),
+                        child: _buildTimetable(theme), // Passa o tema para a agenda
                       ),
           ),
         ],
@@ -159,9 +166,9 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  Widget _buildCalendar() {
+  Widget _buildCalendar(ThemeData theme) {
     return Card(
-      margin: const EdgeInsets.all(8.0),
+      margin: const EdgeInsets.all(12.0),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: TableCalendar(
@@ -185,14 +192,17 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
           _focusedDay = focusedDay;
         },
         calendarStyle: CalendarStyle(
-          selectedDecoration: BoxDecoration(color: Theme.of(context).primaryColor, shape: BoxShape.circle),
-          todayDecoration: BoxDecoration(color: Theme.of(context).primaryColor.withOpacity(0.5), shape: BoxShape.circle),
+          // MODERNO: Usa as cores do tema da aplicação
+          selectedDecoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle),
+          selectedTextStyle: TextStyle(color: theme.colorScheme.onPrimary),
+          todayDecoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.5), shape: BoxShape.circle),
+          todayTextStyle: TextStyle(color: theme.colorScheme.onPrimary),
         ),
       ),
     );
   }
 
-  Widget _buildTimetable() {
+  Widget _buildTimetable(ThemeData theme) {
     final horas = List.generate(15, (i) => 8 + i); // Das 8:00 às 22:00
 
     return SingleChildScrollView(
@@ -203,7 +213,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
           children: [
             _buildTimeAxis(horas),
             Row(
-              children: _salas.map((sala) => _buildRoomColumn(sala, horas)).toList(),
+              children: _salas.map((sala) => _buildRoomColumn(sala, horas, theme)).toList(),
             ),
           ],
         ),
@@ -213,7 +223,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
 
   Widget _buildTimeAxis(List<int> horas) {
     return Container(
-      padding: const EdgeInsets.only(top: 40),
+      padding: const EdgeInsets.only(top: 40), // Espaço para o cabeçalho da sala
       child: Column(
         children: horas.map((hora) {
           return Container(
@@ -228,7 +238,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  Widget _buildRoomColumn(Sala sala, List<int> horas) {
+  Widget _buildRoomColumn(Sala sala, List<int> horas, ThemeData theme) {
     final agendamentosDaSala = _agendamentosDoDia.where((a) => a.salaId == sala.id).toList();
 
     return Container(
@@ -236,59 +246,66 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.shade200))),
       child: Column(
         children: [
+          // Cabeçalho com o nome da sala
           Container(
             height: 40,
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(sala.nome, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
           ),
+          // Slots de horário
           Stack(
             children: [
+              // Slots vazios com botões de adicionar
               Column(
                 children: horas.map((hora) {
                   final slotTime = TimeOfDay(hour: hora, minute: 0);
-                  final agendamentoNesteSlot = agendamentosDaSala.any((ag) => 
-                    (hora >= ag.horaInicio.hour && hora < ag.horaFim.hour)
-                  );
+                  final agendamentoNesteSlot = agendamentosDaSala.any((ag) => (hora >= ag.horaInicio.hour && hora < ag.horaFim.hour));
                   
                   return Container(
                     height: _horaHeight,
                     decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade200))),
                     child: Center(
-                      child: agendamentoNesteSlot ? null : IconButton(
-                        icon: Icon(Icons.add_circle_outline, color: Colors.grey.shade400, size: 20),
-                        onPressed: () => _showCreateDialog(sala: sala, horario: slotTime),
+                      child: agendamentoNesteSlot ? null : IconButton( // Só mostra o '+' se o slot estiver livre
+                        icon: Icon(Icons.add_circle_outline, color: theme.colorScheme.primary.withOpacity(0.5), size: 20),
+                        onPressed: () => _showCreateDialog(sala: sala, horario: slotTime, theme: theme),
                       ),
                     ),
                   );
                 }).toList(),
               ),
+              // Cartões de agendamento (sobrepostos)
               ...agendamentosDaSala.map((agendamento) {
                 final double top = (agendamento.horaInicio.hour - 8) * _horaHeight + (agendamento.horaInicio.minute / 60.0) * _horaHeight;
                 final double height = ((agendamento.horaFim.hour * 60 + agendamento.horaFim.minute) - (agendamento.horaInicio.hour * 60 + agendamento.horaInicio.minute)) / 60.0 * _horaHeight;
+
+                // MODERNO: Define cores com base no tema
+                final cardColor = agendamento.isRecorrente ? theme.colorScheme.primary : theme.colorScheme.secondaryContainer;
+                final textColor = agendamento.isRecorrente ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer;
 
                 return Positioned(
                   top: top,
                   left: 4,
                   right: 4,
-                  height: height > 2 ? height - 2 : height,
+                  height: height > 2 ? height - 2 : height, // Pequeno respiro visual
                   child: InkWell(
                     onTap: () => _showEditDeleteDialog(agendamento),
                     child: Card(
-                      color: agendamento.isRecorrente ? Colors.blue[400] : Colors.red[400],
+                      color: cardColor, // Cor baseada no tema
                       elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)), // Cantos arredondados
                       child: Padding(
-                        padding: const EdgeInsets.all(4.0),
+                        padding: const EdgeInsets.all(6.0),
                         child: Row(
                           children: [
                             if (agendamento.isRecorrente)
-                              const Icon(Icons.sync, color: Colors.white, size: 12),
+                              Icon(Icons.sync, color: textColor, size: 12),
                             if (agendamento.isRecorrente) const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 agendamento.titulo ?? 'Ocupado',
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                overflow: TextOverflow.fade,
+                                style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis, // Melhor que 'fade'
                               ),
                             ),
                           ],
@@ -305,7 +322,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  void _showCreateDialog({required Sala sala, required TimeOfDay horario}) {
+  void _showCreateDialog({required Sala sala, required TimeOfDay horario, required ThemeData theme}) {
     final titleController = TextEditingController();
     bool isRecorrente = false;
     DateTime? dataFimRecorrencia;
@@ -345,6 +362,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                       },
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
+                      activeColor: theme.colorScheme.primary, // MODERNO: Cor do tema
                     ),
                     if (isRecorrente)
                       ListTile(
@@ -395,41 +413,59 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
+  // ✅ CORREÇÃO + PERSONALIZAÇÃO
+  // Esta é a função que corrigimos e modernizamos.
   void _showEditDeleteDialog(Agendamento agendamento) {
-    final titleController = TextEditingController(text: agendamento.titulo);
+    // Pegamos o tema para usar nos ícones
+    final theme = Theme.of(context);
+
     showDialog(
       context: context,
       builder: (context) {
-                  return AlertDialog(
-                  title: const Text('Opções de Agendamento'),
-                  content: Column( // <<< ✅ ADICIONAMOS UMA COLUNA
-                  mainAxisSize: MainAxisSize.min, // <<< ✅ ESTA É A CORREÇÃO PRINCIPAL
-                  children: [
-                  TextField(
-                  controller: titleController,
-                  autofocus: true, // Bónus: foca o campo automaticamente
-                  decoration: const InputDecoration(labelText: 'Título'),
-            ),
-          ],
-         ),
- actions: [
+        return AlertDialog(
+          title: const Text('Opções de Agendamento'),
+          
+          // MODERNO: Usamos uma Coluna com ListTiles para um visual limpo.
+          // Isso resolve o bug de layout que você tinha (a caixa cinza).
+          content: Column(
+            mainAxisSize: MainAxisSize.min, // Garante que o diálogo seja "pequeno"
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                leading: Icon(Icons.label_outline, color: theme.colorScheme.primary),
+                title: Text(agendamento.titulo ?? 'Ocupado'),
+                contentPadding: EdgeInsets.zero,
+              ),
+              ListTile(
+                leading: Icon(Icons.schedule_outlined, color: theme.colorScheme.primary),
+                title: Text('Horário: ${agendamento.horaInicio.format(context)} - ${agendamento.horaFim.format(context)}'),
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (agendamento.isRecorrente)
+                ListTile(
+                  leading: Icon(Icons.sync, color: theme.colorScheme.primary),
+                  title: const Text('Agendamento fixo (semanal)'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+            ],
+          ),
+
+          // Ações alinhadas com o objetivo de "excluir ou fechar"
+          actions: [
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () {
-                Navigator.of(context).pop();
-                _excluirAgendamento(agendamento.id);
+                Navigator.of(context).pop(); // Fecha este diálogo
+                _excluirAgendamento(agendamento.id); // Chama a exclusão
               },
               tooltip: 'Excluir Agendamento',
             ),
-            const Spacer(),
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
-            FilledButton(
-              onPressed: () {
-                _editarAgendamento(agendamento, titleController.text);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Salvar'),
+            const Spacer(), // Empurra os botões para os cantos
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), 
+              child: const Text('Fechar')
             ),
+            // O botão "Salvar" foi removido.
           ],
         );
       },
