@@ -452,22 +452,24 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
 
           // Ações alinhadas com o objetivo de "excluir ou fechar"
           actions: [
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: () {
-                Navigator.of(context).pop(); // Fecha este diálogo
-                _excluirAgendamento(agendamento.id); // Chama a exclusão
-              },
-              tooltip: 'Excluir Agendamento',
-            ),
-            const Spacer(), // Empurra os botões para os cantos
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(), 
-              child: const Text('Fechar')
-            ),
-            // O botão "Salvar" foi removido.
-          ],
-        );
+  Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      IconButton(
+        icon: const Icon(Icons.delete_outline, color: Colors.red),
+        onPressed: () {
+          Navigator.of(context).pop();
+          _excluirAgendamento(agendamento.id);
+        },
+        tooltip: 'Excluir Agendamento',
+      ),
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Fechar'),
+      ),
+    ],
+  )
+],        );
       },
     );
   }
