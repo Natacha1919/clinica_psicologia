@@ -107,10 +107,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: [
                               Container(
                                   child: Image.asset(
-  'images/logo.png', // <<< CORREÇÃO: Remova o 'assets/' inicial
-  height: 250,
-                                    fit: BoxFit.contain, // Ajusta a imagem para caber sem cortar
-                                    color: theme.colorScheme.onPrimary, // Cor para SVG monocromático ou para tint
+                                    'assets/images/logo.png', // Este caminho está correto!
+                                    height: 250,
+                                    fit: BoxFit.contain,
+                                    // color: theme.colorScheme.onPrimary, // <<< LINHA REMOVIDA/COMENTADA
                                   ),
                                 ),
                              const SizedBox(height: 20),
