@@ -20,6 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _redirect() async {
     // Espera um pouco para a UI não piscar
+    // Remover ou ajustar o delay se preferir um redirecionamento mais instantâneo
     await Future.delayed(Duration.zero);
     
     final session = Supabase.instance.client.auth.currentSession;
