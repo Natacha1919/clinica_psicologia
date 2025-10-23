@@ -400,13 +400,19 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Opções de Agendamento'),
-          content: TextField(
-            controller: titleController,
-            decoration: const InputDecoration(labelText: 'Título'),
-          ),
-          actions: [
+                  return AlertDialog(
+                  title: const Text('Opções de Agendamento'),
+                  content: Column( // <<< ✅ ADICIONAMOS UMA COLUNA
+                  mainAxisSize: MainAxisSize.min, // <<< ✅ ESTA É A CORREÇÃO PRINCIPAL
+                  children: [
+                  TextField(
+                  controller: titleController,
+                  autofocus: true, // Bónus: foca o campo automaticamente
+                  decoration: const InputDecoration(labelText: 'Título'),
+            ),
+          ],
+         ),
+ actions: [
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () {
