@@ -135,7 +135,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> {
   }
 
   Future<void> _salvarAlteracoes() async {
-    if (_statusAtual == StatusPaciente.aguardandoVaga) {
+    if (_statusAtual == StatusPaciente.triagemRealizada) {
       if (!_formKey.currentState!.validate()) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, preencha os campos obrigatórios da triagem.'), backgroundColor: Colors.red));
         return;
@@ -216,7 +216,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> {
           }
 
           final paciente = _pacienteAtual!;
-          final bool isModoTriagem = _statusAtual == StatusPaciente.aguardandoVaga;
+          final bool isModoTriagem = _statusAtual == StatusPaciente.triagemRealizada;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),

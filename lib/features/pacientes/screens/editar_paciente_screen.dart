@@ -24,7 +24,7 @@ class _EditarPacienteScreenState extends State<EditarPacienteScreen> {
     'ISENTO COLABORADOR', 'ISENTO COLABORADOR - ENCERRADO', 'ISENTO - ORIENTAÇÃO P.',
   ];
   final List<String> _opcoesClassificacao = ['Orientação', 'Neuropsicologia', 'Psicanálise', 'Psicoterapia', 'Psicodiagnóstico'];
-  final List<String> _opcoesSexo = ['Feminino', 'Masculino', 'Outro'];
+  final List<String> _opcoesSexo = ['Feminino', 'Masculino', 'Intersexo', 'Outro'];
   final List<String> _opcoesEstadoCivil = ['Solteiro (a)', 'Casado (a)', 'Divorciado (a)', 'Viúvo (a)', 'União Estável'];
   final List<String> _diasSemana = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
   final List<String> _opcoesPrioridade = ['Urgente', 'Assim que possível', 'Posso esperar um pouco', 'Não tenho pressa'];
