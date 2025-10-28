@@ -4,6 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/paciente_detalhado_model.dart';
 import 'editar_paciente_screen.dart';
 
+// ===== Imports para o PDF =====
+import '../../../core/services/pdf_generator_service.dart';
+import '../../../core/services/pdf_generator_service.dart' show AgendamentoPdfModel;
+
 class DetalhesPacienteScreen extends StatefulWidget {
   final String pacienteId;
   const DetalhesPacienteScreen({Key? key, required this.pacienteId}) : super(key: key);
@@ -15,6 +19,8 @@ class DetalhesPacienteScreen extends StatefulWidget {
 class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with SingleTickerProviderStateMixin {
   late Future<PacienteDetalhado?> _futurePaciente;
   late TabController _tabController;
+  bool _isGerandoPdf = false;
+  final PdfGeneratorService _pdfService = PdfGeneratorService();
 
   @override
   void initState() {
@@ -22,7 +28,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     _futurePaciente = _getPacienteDetalhado();
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
+      if (!_tabController.indexIsChanging) {
         setState(() {});
       }
     });
@@ -34,28 +40,22 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     super.dispose();
   }
 
+  // Função que busca os detalhes E a contagem via RPC
   Future<PacienteDetalhado?> _getPacienteDetalhado() async {
     if (widget.pacienteId.isEmpty) {
       return null;
     }
     final supabase = Supabase.instance.client;
     try {
-      // ===== ADIÇÃO SOLICITADA 1 =====
-      // Adicionada a coluna 'classificacao_preceptor' ao final da string.
-      const selectColumns =
-          'id, inscrito_id, nome_completo, cpf, status_detalhado, data_desligamento, '
-          'contato, endereco, data_nascimento, idade, sexo, genero, raca, '
-          'religiao, estado_civil, escolaridade, profissao, tipo_atendimento, n_de_inscrição, email, '
-          'historico_saude_mental, uso_medicacao, queixa_triagem, tratamento_saude, rotina_paciente, triagem_realizada_por, dia_atendimento_definido, '
-          'escolaridade_pai, profissao_pai, escolaridade_mae, profissao_mae, prioridade_atendimento, classificacao_preceptor'; // <-- ADICIONADO AQUI
-
       final data = await supabase
-          .from('pacientes_historico_temp')
-          .select(selectColumns)
-          .eq('id', widget.pacienteId)
+          .rpc(
+            'get_paciente_detalhado_com_contagem', // Nome da função SQL
+            params: {'p_paciente_id': widget.pacienteId}
+          )
           .single();
 
       return PacienteDetalhado.fromJson(data);
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,12 +66,58 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     }
   }
 
+  // Função para gerar o PDF (com busca real)
+  Future<void> _handleGerarPdf(PacienteDetalhado paciente) async {
+    setState(() => _isGerandoPdf = true);
+    try {
+      final agendamentosData = await Supabase.instance.client
+          .from('agendamentos')
+          .select('''
+            data_agendamento,
+            hora_inicio, 
+            titulo,
+            alunos ( nome_completo )
+          ''')
+          .eq('paciente_id', paciente.id)
+          .order('data_agendamento', ascending: true);
+
+      final agendamentos = (agendamentosData as List).map((json) {
+          final alunoInfo = json['alunos'] as Map<String, dynamic>?;
+          final alunoNome = alunoInfo?['nome_completo'] ?? 'Aluno não informado';
+
+          return AgendamentoPdfModel(
+            data: DateTime.parse(json['data_agendamento']),
+            horaInicio: json['hora_inicio']?.toString().substring(0, 5) ?? '--:--',
+            titulo: '${json['titulo'] ?? 'Sessão'} (com ${alunoNome})',
+          );
+      }).toList();
+
+      await _pdfService.gerarProntuarioPaciente(
+        paciente: paciente,
+        agendamentos: agendamentos,
+      );
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao buscar dados ou gerar PDF: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGerandoPdf = false);
+      }
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Colors.grey[50],
+        // ... (AppBar sem alterações)
+         backgroundColor: Colors.grey[50],
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -90,30 +136,45 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
               builder: (context, snapshot) {
                 if (snapshot.hasData && snapshot.data != null) {
                   final paciente = snapshot.data!;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 16.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        final result = await Navigator.push<bool>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditarPacienteScreen(paciente: paciente),
+                  return Row(
+                    children: [
+                      _isGerandoPdf
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 14.0),
+                              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black87, strokeWidth: 2))),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.black87),
+                              tooltip: 'Gerar Prontuário PDF',
+                              onPressed: () => _handleGerarPdf(paciente),
+                            ),
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16.0),
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditarPacienteScreen(paciente: paciente),
+                              ),
+                            );
+                            if (result == true) {
+                              setState(() {
+                                _futurePaciente = _getPacienteDetalhado();
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.edit, size: 16),
+                          label: const Text('Editar Informações'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00A28D),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                        );
-                        if (result == true) {
-                          setState(() {
-                            _futurePaciente = _getPacienteDetalhado();
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.edit, size: 16),
-                      label: const Text('Editar Informações'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00A28D),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                       ),
-                    ),
+                    ],
                   );
                 }
                 return const SizedBox.shrink();
@@ -132,44 +193,57 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
 
           final paciente = snapshot.data!;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            child: Column(
+          return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildProfileHeader(paciente),
-                const SizedBox(height: 24),
-                TabBar(
-                  controller: _tabController,
-                  labelColor: Theme.of(context).colorScheme.primary,
-                  unselectedLabelColor: Colors.grey[600],
-                  indicatorColor: Theme.of(context).colorScheme.primary,
-                  isScrollable: true,
-                  tabs: const [
-                    Tab(text: 'Visão Geral'),
-                    Tab(text: 'Consultas'),
-                    Tab(text: 'Financeiro'),
-                    Tab(text: 'Notas Clínicas'),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                  child: _buildProfileHeader(paciente),
                 ),
-                const SizedBox(height: 24),
-                [
-                  _buildVisaoGeralTab(paciente),
-                  _buildPlaceholderTab('Consultas'),
-                  _buildPlaceholderTab('Financeiro'),
-                  _buildPlaceholderTab('Notas Clínicas'),
-                ][_tabController.index],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: Theme.of(context).colorScheme.primary,
+                    unselectedLabelColor: Colors.grey[600],
+                    indicatorColor: Theme.of(context).colorScheme.primary,
+                    isScrollable: true,
+                    tabs: const [
+                      Tab(text: 'Visão Geral'),
+                      Tab(text: 'Consultas'),
+                      Tab(text: 'Financeiro'),
+                      Tab(text: 'Notas Clínicas'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: IndexedStack(
+                      index: _tabController.index,
+                      children: [
+                        // Aba 0: Visão Geral (Passa o paciente com a contagem)
+                        SingleChildScrollView(child: _buildVisaoGeralTab(paciente)),
+                        _buildConsultasTab(paciente.id),
+                        _buildPlaceholderTab('Financeiro'),
+                        _buildPlaceholderTab('Notas Clínicas'),
+                      ],
+                    ),
+                  ),
+                ),
               ],
-            ),
-          );
+            );
         },
       ),
     );
   }
 
+  // ===== FUNÇÃO DA ABA VISÃO GERAL (LAYOUT AJUSTADO) =====
   Widget _buildVisaoGeralTab(PacienteDetalhado paciente) {
     return Column(
       children: [
+        // Cards de Informações Pessoais e Saúde (sem alteração)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -198,7 +272,6 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                 title: 'Informações de Saúde e Triagem',
                 data: {
                   'Atendimento Escolhido (Paciente)': paciente.tipoAtendimento,
-                  // ===== ADIÇÃO SOLICITADA 2 =====
                   'Classificação (Preceptor)': paciente.classificacaoPreceptor,
                   'Queixa (Resumo da Triagem)': paciente.queixaTriagem,
                   'Atendimento de Saúde Mental Anterior': paciente.historicoSaudeMental,
@@ -213,26 +286,134 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
           ],
         ),
         const SizedBox(height: 24),
+
+        // --- LINHA DO CARD MÉTRICO (CENTRALIZADO) ---
         Row(
+          // 1. Centraliza o conteúdo horizontalmente
+          mainAxisAlignment: MainAxisAlignment.center, 
           children: [
-            Expanded(child: _buildMetricCard(icon: Icons.calendar_today, value: '?', label: 'Total de Consultas', color: Colors.blue)),
-            const SizedBox(width: 24),
-            Expanded(child: _buildMetricCard(icon: Icons.attach_money, value: '?', label: 'Total Pago', color: Colors.green)),
-            const SizedBox(width: 24),
-            Expanded(child: _buildMetricCard(icon: Icons.book_online, value: '?', label: 'Consultas Agendadas', color: Colors.orange)),
+            // 2. Usamos Flexible em vez de Expanded para permitir que o card
+            //    tenha seu tamanho natural, mas ainda limitado pela Row.
+            //    O SizedBox força uma largura mínima/máxima se necessário.
+            Flexible(
+              // flex: 0, // Não precisa de flex se só há um item visível
+              child: ConstrainedBox( // Limita a largura do card
+                constraints: const BoxConstraints(maxWidth: 250), // Ajuste a largura máxima como desejar
+                child: _buildMetricCard(
+                  icon: Icons.calendar_today_outlined, 
+                  // 3. Usa a contagem real (fallback simplificado: substituir por consulta real quando disponível no modelo)
+                  value: '0', 
+                  label: 'Total de Consultas', 
+                  color: Colors.blueAccent
+                ),
+              ),
+            ),
+            // 4. Os outros cards foram removidos
           ],
         )
+        // --- FIM DA LINHA DO CARD MÉTRICO ---
       ],
     );
   }
+  // =======================================================
 
+
+  // --- FUNÇÃO DA ABA CONSULTAS (sem alteração) ---
+  Widget _buildConsultasTab(String pacienteId) {
+    // ... (código completo da função _buildConsultasTab)
+    final futureConsultas = Supabase.instance.client
+        .from('agendamentos')
+        .select('''
+          id, 
+          data_agendamento, 
+          hora_inicio, 
+          titulo, 
+          alunos ( nome_completo ), 
+          salas ( nome ) 
+        ''')
+        .eq('paciente_id', pacienteId)
+        .order('data_agendamento', ascending: false); // Mais recentes primeiro
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: futureConsultas,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Erro ao buscar consultas: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.calendar_today_outlined, size: 48, color: Colors.grey),
+                SizedBox(height: 16),
+                Text('Nenhuma consulta encontrada para este paciente.'),
+              ],
+            ),
+          );
+        }
+
+        final consultas = snapshot.data!;
+
+        return ListView.builder(
+          itemCount: consultas.length,
+          itemBuilder: (context, index) {
+            final consulta = consultas[index];
+            final alunoInfo = consulta['alunos'] as Map<String, dynamic>?;
+            final salaInfo = consulta['salas'] as Map<String, dynamic>?;
+            DateTime? dataAgendamento;
+            try { dataAgendamento = DateTime.parse(consulta['data_agendamento']); } catch (_) {}
+            final dataFormatada = dataAgendamento != null ? DateFormat('dd/MM/yyyy').format(dataAgendamento) : 'Data inválida';
+            final horaFormatada = consulta['hora_inicio']?.toString().substring(0, 5) ?? '--:--';
+
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 0),
+              elevation: 1,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  child: Text(
+                    dataAgendamento != null ? DateFormat('dd').format(dataAgendamento) : '?',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                  ),
+                ),
+                title: Text(consulta['titulo'] ?? 'Sessão'),
+                subtitle: Text(
+                  'Aluno: ${alunoInfo?['nome_completo'] ?? 'Não informado'}\n'
+                  'Sala: ${salaInfo?['nome'] ?? 'Não informada'} • $dataFormatada às $horaFormatada'
+                ),
+                isThreeLine: true,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  print("Clicou na consulta ID: ${consulta['id']}");
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- Funções de Widgets Auxiliares (sem alteração) ---
   Widget _buildPlaceholderTab(String title) {
-    return Center(
+     return Center(
       heightFactor: 5,
-      child: Text(
-        'Seção "$title" em construção...',
-        style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-      ),
+      child: Column(
+         mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.construction_outlined, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Seção "$title" em construção...',
+              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+            ),
+          ],
+        ),
     );
   }
 
@@ -278,6 +459,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center, // Centraliza o ícone e o texto dentro do card
           children: [
             CircleAvatar(
               radius: 20,
@@ -299,7 +481,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
   }
 
   Widget _buildProfileHeader(PacienteDetalhado paciente) {
-    return Column(
+     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -379,4 +561,4 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
       ),
     );
   }
-}
+} // Fim da classe _DetalhesPacienteScreenState

@@ -8,6 +8,9 @@ import 'features/triagem/screens/triagem_screen.dart';
 import 'features/agendamento/screens/agendamento_screen.dart';
 import 'features/pacientes/screens/lista_pacientes_screen.dart';
 
+// ===== ADIÇÃO 1: Importar a nova tela de cadastro de aluno =====
+import 'package:clinica_psicologi/features/alunos/screens/alunos_screen.dart';
+
 class AppScaffold extends StatefulWidget {
   const AppScaffold({super.key});
 
@@ -126,7 +129,11 @@ class _AppScaffoldState extends State<AppScaffold> {
       ),
     ];
 
+    // ===== ADIÇÃO 2: Lógica de permissão para Alunos e Financeiro =====
+    // Adicionamos as novas telas se o usuário for Admin ou Coordenação
     if (_userRole == 'Coordenação' || _userRole == 'Administrador') {
+      
+      // Tela de Financeiro (que você já tinha)
       availablePages.add(const Center(child: Text('Tela de Financeiro em construção')));
       availableDestinations.add(
         const NavigationRailDestination(
@@ -136,8 +143,21 @@ class _AppScaffoldState extends State<AppScaffold> {
           label: Text('Financeiro'),
         ),
       );
+
+      // ===== ADIÇÃO 3: Nova tela de Cadastro de Aluno =====
+      availablePages.add(const AlunosScreen()); // Adiciona a tela
+      availableDestinations.add(
+        const NavigationRailDestination(
+          padding: EdgeInsets.zero,
+          icon: Icon(Icons.school_outlined), // Ícone para "Alunos"
+          selectedIcon: Icon(Icons.school),
+          label: Text('Alunos'), // Texto do menu
+        ),
+      );
+      // =======================================================
     }
     
+    // Garantia para não quebrar o índice caso o usuário mude
     if (_selectedIndex >= availablePages.length) {
       _selectedIndex = 0;
     }
@@ -170,7 +190,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                   const SizedBox(height: 20),
                 ],
               ),
-              destinations: availableDestinations,
+              destinations: availableDestinations, // <- A lista já está atualizada
               trailing: Expanded(
                 child: Align(
                   alignment: Alignment.bottomCenter,
@@ -212,6 +232,7 @@ class _AppScaffoldState extends State<AppScaffold> {
             ),
           ),
           const VerticalDivider(thickness: 1, width: 1),
+          // O corpo da tela agora é dinâmico, baseado na lista
           Expanded(
             child: availablePages[_selectedIndex],
           ),
