@@ -11,7 +11,7 @@ import '../models/sala_model.dart';
 import '../../pacientes/models/paciente_dropdown_model.dart';
 import '../../alunos/models/aluno_model.dart';
 
-// ===== ADIÇÃO 1: Importar o novo pacote =====
+// Import do pacote de dropdown com pesquisa
 import 'package:dropdown_search/dropdown_search.dart';
 
 class AgendamentoScreen extends StatefulWidget {
@@ -41,8 +41,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   }
 
   Future<void> _fetchDataParaDia(DateTime dia) async {
-    // ... (sem alterações) ...
-     if (mounted) setState(() { _isLoading = true; _errorMessage = null; });
+    if (mounted) setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
       final salasResponse = await SupabaseConfig.client
@@ -50,6 +49,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
           .select()
           .order('nome', ascending: true);
 
+      // TODO: Atualizar esta RPC para também buscar nomes de paciente/aluno
       final agendamentosResponse = await SupabaseConfig.client.rpc(
         'get_agendamentos_para_dia',
         params: {'p_target_date': DateFormat('yyyy-MM-dd').format(dia)},
@@ -61,6 +61,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       if (mounted) {
         setState(() {
           _salas = salasData.map((json) => Sala.fromJson(json)).toList();
+          // Usa o fromJson Robusto (que corrigimos para o deploy)
           _agendamentosDoDia = agendamentosData.map((json) => Agendamento.fromJson(json)).toList();
           _isLoading = false;
         });
@@ -71,10 +72,10 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
-  // ===== ADIÇÃO 2: Modificar a busca de pacientes para aceitar filtro =====
-  /// Busca a lista de pacientes (ID e Nome) para o dropdown, opcionalmente filtrando por nome.
+  /// Busca a lista de pacientes (com filtro de status e nome)
   Future<List<PacienteDropdownModel>> _fetchPacientesParaDropdown({String? filtroNome}) async {
     try {
+      // Lista de status válidos para agendamento
       final List<String> statusAtivos = [
         'PG - ATIVO',
         'BR - ATIVO',
@@ -82,30 +83,25 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
         'ISENTO - ORIENTAÇÃO P.'
       ];
       
-      // Construção da query no Supabase
       var query = Supabase.instance.client
           .from('pacientes_historico_temp')
           .select('id, nome_completo')
-          .filter('status_detalhado', 'in', statusAtivos);
+          .filter('status_detalhado', 'in', statusAtivos); // Filtro de Status
 
-      // Aplica o filtro de nome se ele foi fornecido
+      // Aplica o filtro de nome se ele foi fornecido (para a pesquisa)
       if (filtroNome != null && filtroNome.isNotEmpty) {
-        // '.ilike()' busca por nomes que CONTENHAM o filtro (ignorando maiúsculas/minúsculas)
         query = query.ilike('nome_completo', '%$filtroNome%');
       }
 
-      // Ordena por nome
       final data = await query.order('nome_completo', ascending: true);
 
       final pacientes = (data as List)
           .map((json) => PacienteDropdownModel.fromJson(json))
           .toList();
 
-      // Não mostra snackbar de erro se a lista vazia for resultado de um filtro
       if (pacientes.isEmpty && (filtroNome == null || filtroNome.isEmpty) && mounted) {
-        // _showSnackBar('Nenhum paciente com status válido encontrado.', isError: true); // Pode ser irritante
+        _showSnackBar('Nenhum paciente com status válido encontrado.', isError: true);
       }
-
       return pacientes;
       
     } catch (e) {
@@ -114,12 +110,11 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
-
+  /// Busca a lista de alunos (estagiários)
   Future<List<AlunoModel>> _fetchAlunosParaDropdown() async {
-     // ... (sem alterações) ...
-     try {
+    try {
       final data = await Supabase.instance.client
-          .from('alunos') // Da nova tabela 'alunos'
+          .from('alunos')
           .select('id, nome_completo, ra')
           .order('nome_completo', ascending: true);
 
@@ -129,35 +124,34 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       return alunos;
     } catch (e) {
       _showSnackBar('Erro ao buscar alunos: $e', isError: true);
-      return []; // Retorna lista vazia em caso de erro
+      return [];
     }
   }
 
 
+  /// Cria o agendamento no Supabase
   Future<void> _criarAgendamento({
     required Sala sala,
     required TimeOfDay horario,
     required String titulo,
     required bool isRecorrente,
     DateTime? dataFimRecorrencia,
-    required String pacienteId,
-    required String alunoId,
+    required String pacienteId, // ID do Paciente
+    required String alunoId,    // ID do Aluno
   }) async {
-     // ... (sem alterações) ...
-     final horaInicio = '${horario.hour.toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
+    final horaInicio = '${horario.hour.toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
     final horaFim = '${(horario.hour + 1).toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
     final data = DateFormat('yyyy-MM-dd').format(_selectedDay);
 
     try {
-      // Adicionamos os novos IDs à inserção
       await SupabaseConfig.client.from('agendamentos').insert({
         'sala_id': sala.id,
-        'paciente_id': pacienteId, // <-- ADICIONADO
-        'aluno_id': alunoId,       // <-- ADICIONADO
+        'paciente_id': pacienteId, 
+        'aluno_id': alunoId,       
         'data_agendamento': data,
         'hora_inicio': horaInicio,
         'hora_fim': horaFim,
-        'titulo': titulo.isNotEmpty ? titulo : 'Agendado', // Título default
+        'titulo': titulo.isNotEmpty ? titulo : 'Agendado',
         'is_recorrente': isRecorrente,
         'data_fim_recorrencia': isRecorrente ? DateFormat('yyyy-MM-dd').format(dataFimRecorrencia!) : null,
       });
@@ -169,9 +163,9 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   }
 
 
+  /// Exclui um agendamento
   Future<void> _excluirAgendamento(String agendamentoId) async {
-     // ... (sem alterações) ...
-      final confirmed = await showDialog<bool>(
+     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar Exclusão'),
@@ -193,9 +187,9 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
+  /// Mostra o feedback (SnackBar)
   void _showSnackBar(String message, {bool isError = false}) {
-     // ... (sem alterações) ...
-     if (!mounted) return;
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: isError ? Colors.red : Colors.green),
     );
@@ -203,8 +197,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
 
   @override
   Widget build(BuildContext context) {
-     // ... (sem alterações) ...
-     return Scaffold(
+    return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('Agendamento de Salas'),
@@ -230,8 +223,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   }
 
   Widget _buildCalendar() {
-     // ... (sem alterações) ...
-      return Card(
+    return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -264,8 +256,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   }
 
   Widget _buildTimetable() {
-     // ... (sem alterações) ...
-     final horas = List.generate(15, (i) => 8 + i); // Das 8:00 às 22:00
+    final horas = List.generate(15, (i) => 8 + i); // Das 8:00 às 22:00
 
     return SingleChildScrollView(
       child: SingleChildScrollView(
@@ -284,8 +275,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   }
 
   Widget _buildTimeAxis(List<int> horas) {
-     // ... (sem alterações) ...
-     return Container(
+    return Container(
       padding: const EdgeInsets.only(top: 40),
       child: Column(
         children: horas.map((hora) {
@@ -302,8 +292,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   }
 
   Widget _buildRoomColumn(Sala sala, List<int> horas) {
-     // ... (sem alterações) ...
-      final agendamentosDaSala = _agendamentosDoDia.where((a) => a.salaId == sala.id).toList();
+    final agendamentosDaSala = _agendamentosDoDia.where((a) => a.salaId == sala.id).toList();
 
     return Container(
       width: _roomWidth,
@@ -321,9 +310,12 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
               Column(
                 children: horas.map((hora) {
                   final slotTime = TimeOfDay(hour: hora, minute: 0);
-                  final agendamentoNesteSlot = agendamentosDaSala.any((ag) => 
-                      (hora >= ag.horaInicio.hour && hora < ag.horaFim.hour)
-                  );
+                  // Verifica se algum agendamento (que pode ter 'null' em horaInicio/horaFim)
+                  // está neste slot.
+                  final agendamentoNesteSlot = agendamentosDaSala.any((ag) {
+                     if (ag.horaInicio == null || ag.horaFim == null) return false; // Ignora agendamentos malformados
+                     return (hora >= ag.horaInicio!.hour && hora < ag.horaFim!.hour);
+                  });
                   
                   return Container(
                     height: _horaHeight,
@@ -331,7 +323,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                     child: Center(
                       child: agendamentoNesteSlot ? null : IconButton(
                         icon: Icon(Icons.add_circle_outline, color: Colors.grey.shade400, size: 20),
-                        // Chamamos o NOVO diálogo
                         onPressed: () => _showCreateDialog(sala: sala, horario: slotTime),
                       ),
                     ),
@@ -339,10 +330,14 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                 }).toList(),
               ),
               ...agendamentosDaSala.map((agendamento) {
-                final double top = (agendamento.horaInicio.hour - 8) * _horaHeight + (agendamento.horaInicio.minute / 60.0) * _horaHeight;
-                final double height = ((agendamento.horaFim.hour * 60 + agendamento.horaFim.minute) - (agendamento.horaInicio.hour * 60 + agendamento.horaInicio.minute)) / 60.0 * _horaHeight;
+                // Se hora for null, não pode ser desenhado
+                if (agendamento.horaInicio == null || agendamento.horaFim == null) {
+                  return const SizedBox.shrink(); // Corrigido: usar SizedBox do Flutter
+                }
 
-                // TODO: Atualizar a cor e o texto para refletir o paciente/aluno
+                final double top = (agendamento.horaInicio!.hour - 8) * _horaHeight + (agendamento.horaInicio!.minute / 60.0) * _horaHeight;
+                final double height = ((agendamento.horaFim!.hour * 60 + agendamento.horaFim!.minute) - (agendamento.horaInicio!.hour * 60 + agendamento.horaInicio!.minute)) / 60.0 * _horaHeight;
+
                 return Positioned(
                   top: top,
                   left: 4,
@@ -351,18 +346,18 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                   child: InkWell(
                     onTap: () => _showEditDeleteDialog(agendamento),
                     child: Card(
-                      color: agendamento.isRecorrente ? Colors.blue[400] : Colors.red[400],
+                      color: agendamento.isRecorrente == true ? Colors.blue[400] : Colors.red[400],
                       elevation: 2,
                       child: Padding(
                         padding: const EdgeInsets.all(4.0),
                         child: Row(
                           children: [
-                            if (agendamento.isRecorrente)
+                            if (agendamento.isRecorrente == true)
                               const Icon(Icons.sync, color: Colors.white, size: 12),
-                            if (agendamento.isRecorrente) const SizedBox(width: 4),
+                            if (agendamento.isRecorrente == true) const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                agendamento.titulo ?? 'Ocupado', // TODO: Mostrar nome do paciente/aluno
+                                agendamento.titulo ?? 'Ocupado',
                                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                 overflow: TextOverflow.fade,
                               ),
@@ -382,18 +377,16 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
   }
 
 
-  // ===== ADIÇÃO 3: Atualizar _showCreateDialog para usar DropdownSearch =====
+  /// DIÁLOGO DE CRIAR AGENDAMENTO (COM DROPDOWN DE PESQUISA)
   void _showCreateDialog({required Sala sala, required TimeOfDay horario}) {
     final titleController = TextEditingController();
     bool isRecorrente = false;
     DateTime? dataFimRecorrencia;
 
-    // Variáveis para guardar os dados dos dropdowns
     String? _selectedPacienteId;
-    PacienteDropdownModel? _selectedPacienteModel; // Guarda o objeto selecionado
+    PacienteDropdownModel? _selectedPacienteModel; 
     String? _selectedAlunoId;
 
-    // Future para carregar os ALUNOS (continua igual)
     final Future<List<AlunoModel>> _alunosFuture = _fetchAlunosParaDropdown();
 
     showDialog(
@@ -410,7 +403,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // --- Informações (Sala, Dia, Hora) ---
                       Text('Sala: ${sala.nome}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       Text('Dia: ${DateFormat('dd/MM/yyyy', 'pt_BR').format(_selectedDay)}'),
                       Text('Horário: ${horario.format(context)}'),
@@ -418,23 +410,16 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
 
                       // --- Dropdown de PACIENTES com PESQUISA ---
                       DropdownSearch<PacienteDropdownModel>(
-                        // Propriedades para busca assíncrona
                         asyncItems: (String filter) => _fetchPacientesParaDropdown(filtroNome: filter),
-                        
-                        // Como mostrar o item na lista e no campo selecionado
                         itemAsString: (PacienteDropdownModel p) => p.nomeCompleto,
-                        
-                        // O que acontece quando um item é selecionado
                         onChanged: (PacienteDropdownModel? data) {
                           setDialogState(() {
                             _selectedPacienteModel = data;
                             _selectedPacienteId = data?.id;
                           });
                         },
-                        
-                        // Configurações da aparência do Pop-up (lista)
                         popupProps: PopupProps.menu(
-                          showSearchBox: true, // HABILITA A PESQUISA!
+                          showSearchBox: true, 
                           searchFieldProps: const TextFieldProps(
                             decoration: InputDecoration(
                               labelText: "Pesquisar Paciente",
@@ -442,30 +427,11 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                               border: OutlineInputBorder(),
                             ),
                           ),
-                          itemBuilder: (context, paciente, isSelected) {
-                            return ListTile(
-                              title: Text(paciente.nomeCompleto),
-                            );
-                          },
-                          emptyBuilder: (context, searchEntry) => const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Text("Nenhum paciente encontrado."),
-                            ),
-                          ),
-                          loadingBuilder: (context, searchEntry) => const Center(child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(),
-                          )),
-                           errorBuilder: (context, searchEntry, exception) => const Center(
-                             child: Padding(
-                               padding: EdgeInsets.all(16.0),
-                               child: Text("Erro ao buscar pacientes.", style: TextStyle(color: Colors.red)),
-                             ),
-                           ),
+                          itemBuilder: (context, paciente, isSelected) => ListTile(title: Text(paciente.nomeCompleto)),
+                          emptyBuilder: (context, searchEntry) => const Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text("Nenhum paciente encontrado."))),
+                          loadingBuilder: (context, searchEntry) => const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator())),
+                          errorBuilder: (context, searchEntry, exception) => const Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text("Erro ao buscar pacientes.", style: TextStyle(color: Colors.red)))),
                         ),
-
-                        // Configurações da aparência do campo principal
                         dropdownDecoratorProps: const DropDownDecoratorProps(
                           dropdownSearchDecoration: InputDecoration(
                             labelText: "Paciente",
@@ -473,20 +439,15 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                             border: OutlineInputBorder(),
                           ),
                         ),
-                        
-                        // Item selecionado atualmente (se houver)
                         selectedItem: _selectedPacienteModel,
-
-                        // Validação
                         validator: (value) => value == null ? 'Campo obrigatório' : null,
                       ),
                       const SizedBox(height: 16),
 
-                      // --- Dropdown de ALUNOS (sem pesquisa, por enquanto) ---
+                      // --- Dropdown de ALUNOS (Normal) ---
                       FutureBuilder<List<AlunoModel>>(
                         future: _alunosFuture,
                         builder: (context, snapshot) {
-                          // (Esta parte continua igual à anterior)
                            if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: LinearProgressIndicator());
                           }
@@ -511,20 +472,18 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                               });
                             },
                             validator: (value) => value == null ? 'Campo obrigatório' : null,
-                            decoration: const InputDecoration(border: OutlineInputBorder()), // Borda
+                            decoration: const InputDecoration(border: OutlineInputBorder()), 
                           );
                         },
                       ),
                       const SizedBox(height: 16),
 
-                      // --- Título (Notas) ---
                       TextField(
                         controller: titleController,
                         decoration: const InputDecoration(labelText: 'Título/Notas (Opcional)', border: OutlineInputBorder()),
                       ),
                       const SizedBox(height: 8),
 
-                      // --- Checkbox Recorrente ---
                       CheckboxListTile(
                         title: const Text('Agendamento fixo (semanal)'),
                         value: isRecorrente,
@@ -540,7 +499,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                         contentPadding: EdgeInsets.zero,
                       ),
 
-                      // --- Seletor de Data Fim (Recorrente) ---
                       if (isRecorrente)
                         ListTile(
                           title: Text(dataFimRecorrencia == null
@@ -568,7 +526,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                 TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
                 FilledButton(
                   onPressed: () {
-                    // Validação
                     if (_selectedPacienteId == null || _selectedAlunoId == null) {
                        _showSnackBar('Selecione um paciente e um aluno.', isError: true);
                        return;
@@ -578,7 +535,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                       return;
                     }
 
-                    // Chama a função _criarAgendamento ATUALIZADA
                     _criarAgendamento(
                       sala: sala,
                       horario: horario,
@@ -600,23 +556,22 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-
+  /// DIÁLOGO DE OPÇÕES DE AGENDAMENTO (Corrigido para o deploy)
   void _showEditDeleteDialog(Agendamento agendamento) {
-     // ... (sem alterações) ...
-     showDialog(
+    showDialog(
       context: context,
       builder: (context) {
          return AlertDialog(
           title: const Text('Opções de Agendamento'),
+          // Conteúdo restaurado e seguro contra nulos
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start, 
             children: [
-              Text("Título: ${agendamento.titulo ?? 'Ocupado'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("Título: ${agendamento.titulo ?? 'Não informado'}", 
+                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 16),
-              // TODO: Quando o modelo 'Agendamento' for atualizado, mostre o paciente e aluno aqui.
-              // Text("Paciente: ${agendamento.pacienteNome}"),
-              // Text("Aluno: ${agendamento.alunoNome}"),
+              // TODO: Mostrar paciente/aluno aqui quando o modelo Agendamento for atualizado
             ],
           ),
           actions: [
