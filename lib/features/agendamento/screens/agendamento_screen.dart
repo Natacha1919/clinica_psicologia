@@ -78,10 +78,11 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
         'ISENTO - ORIENTAÇÃO P.'
       ];
       
+      final inClause = '(${statusAtivos.map((s) => '"$s"').join(",")})';
       var query = Supabase.instance.client
           .from('pacientes_historico_temp')
           .select('id, nome_completo')
-          .filter('status_detalhado', 'in', statusAtivos);
+          .filter('status_detalhado', 'in', inClause);
 
       if (filtroNome != null && filtroNome.isNotEmpty) {
         query = query.ilike('nome_completo', '%$filtroNome%');
@@ -280,7 +281,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  // ===== ALTERAÇÃO 1: Na chamada 'onTap' =====
+  // (Função _buildRoomColumn - está correta, chamando a nova função)
   Widget _buildRoomColumn(Sala sala, List<int> horas) {
     final agendamentosDaSala = _agendamentosDoDia.where((a) => a.salaId == sala.id).toList();
 
@@ -332,11 +333,8 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                   height: height > 2 ? height - 2 : height,
                   child: InkWell(
                     
-                    // ===== AQUI ESTÁ A MUDANÇA 1 =====
-                    // Não passamos mais o objeto 'agendamento' inteiro.
-                    // Passamos apenas os valores primitivos (Strings).
-                    onTap: () => _showEditDeleteDialog(agendamento.id, agendamento.titulo),
-                    // ===================================
+                    // ===== ⭐ MUDANÇA 1: Chamando a nova função =====
+                    onTap: () => _showEditDeleteOptions(agendamento.id, agendamento.titulo),
                     
                     child: Card(
                       color: isRecorrente ? Colors.blue[400] : Colors.red[400],
@@ -520,41 +518,81 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  // ===== ALTERAÇÃO 2: Na assinatura da função =====
-  void _showEditDeleteDialog(String agendamentoId, String? titulo) {
-    showDialog(
-      context: context,
-      builder: (context) {
-         return AlertDialog(
-          title: const Text('Opções de Agendamento'),
-          
-          // ===== ALTERAÇÃO 3: Usando a variável 'titulo' =====
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start, 
+  // ===== ⭐ MUDANÇA 2: Substituindo showDialog por showModalBottomSheet =====
+  
+  /// Exibe um menu deslizante (bottom sheet) com opções para o agendamento
+  void _showEditDeleteOptions(String agendamentoId, String? titulo) {
+    // Usamos o context do Scaffold principal, o que é mais seguro
+    final scaffoldContext = context; 
+
+    showModalBottomSheet(
+      context: scaffoldContext,
+      // Define cantos arredondados
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      // Limita a largura em telas grandes (web)
+      constraints: const BoxConstraints(maxWidth: 600),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // Encolhe para o tamanho do conteúdo
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text("Título: ${titulo ?? 'Não informado'}", 
-                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              // "Puxador" (Handle) - bom para UX
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
-              // TODO: Mostrar paciente/aluno aqui
+              
+              // Título
+              Text(
+                'Opções de Agendamento',
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              
+              // Subtítulo (o título do agendamento)
+              Text(
+                'Título: ${titulo ?? 'Não informado'}',
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
+              const Divider(height: 24),
+
+              // TODO: Adicionar aqui informações do Paciente e Aluno
+              // (quando a busca principal for atualizada)
+
+              // Botão de Excluir
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Excluir Agendamento', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.of(context).pop(); // Fecha o bottom sheet
+                  _excluirAgendamento(agendamentoId); // Chama a função de exclusão
+                },
+              ),
+              
+              // Botão de Fechar
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: const Text('Fechar'),
+                onTap: () {
+                  Navigator.of(context).pop(); // Apenas fecha o bottom sheet
+                },
+              ),
+              const SizedBox(height: 8),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: () {
-                Navigator.of(context).pop(); 
-                // Usando a variável 'agendamentoId'
-                _excluirAgendamento(agendamentoId); 
-              },
-              tooltip: 'Excluir Agendamento',
-            ),
-            const Spacer(), 
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(), 
-              child: const Text('Fechar')
-            ),
-          ],
         );
       },
     );
