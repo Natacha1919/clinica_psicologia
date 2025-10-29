@@ -38,32 +38,26 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     _fetchDataParaDia(_selectedDay);
   }
 
-  // ===== ⭐ MUDANÇA 1: SUBSTITUIR RPC POR SELECT ⭐ =====
+  // (Função _fetchDataParaDia - USA SELECT, está correta)
   Future<void> _fetchDataParaDia(DateTime dia) async {
     if (mounted) setState(() { _isLoading = true; _errorMessage = null; });
-
     try {
       final salasResponse = await SupabaseConfig.client
           .from('salas')
           .select()
           .order('nome', ascending: true);
 
-      // --- ABANDONAMOS O RPC 'get_agendamentos_para_dia' ---
-      // Esta consulta 'select' é mais simples e busca *todos* os campos
-      // da tabela 'agendamentos', incluindo os novos.
       final agendamentosResponse = await SupabaseConfig.client
           .from('agendamentos')
-          .select('*') // Busca todas as colunas
-          .eq('data_agendamento', DateFormat('yyyy-MM-dd').format(dia)); // Para o dia selecionado
+          .select('*') 
+          .eq('data_agendamento', DateFormat('yyyy-MM-dd').format(dia)); 
 
-      // O resto da lógica continua igual
       final List<Map<String, dynamic>> salasData = List<Map<String, dynamic>>.from(salasResponse as List);
       final List<Map<String, dynamic>> agendamentosData = List<Map<String, dynamic>>.from(agendamentosResponse as List);
 
       if (mounted) {
         setState(() {
           _salas = salasData.map((json) => Sala.fromJson(json)).toList();
-          // O Agendamento.fromJson (que corrigimos) agora receberá TODOS os campos
           _agendamentosDoDia = agendamentosData.map((json) => Agendamento.fromJson(json)).toList();
           _isLoading = false;
         });
@@ -73,10 +67,9 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       if (mounted) setState(() { _isLoading = false; _errorMessage = e.toString(); });
     }
   }
-  // =======================================================
 
+  // (Função _fetchPacientesParaDropdown - USA FILTRO .in_(), está correta)
   Future<List<PacienteDropdownModel>> _fetchPacientesParaDropdown({String? filtroNome}) async {
-    // ... (sem alterações)
     try {
       final List<String> statusAtivos = [
         'PG - ATIVO',
@@ -88,7 +81,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       var query = Supabase.instance.client
           .from('pacientes_historico_temp')
           .select('id, nome_completo')
-          .filter('status_detalhado', 'in', '(${statusAtivos.map((s) => '"$s"').join(',')})');
+          .filter('status_detalhado', 'in', statusAtivos);
 
       if (filtroNome != null && filtroNome.isNotEmpty) {
         query = query.ilike('nome_completo', '%$filtroNome%');
@@ -107,8 +100,8 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
+  // (Função _fetchAlunosParaDropdown - está correta)
   Future<List<AlunoModel>> _fetchAlunosParaDropdown() async {
-    // ... (sem alterações)
      try {
       final data = await Supabase.instance.client
           .from('alunos') 
@@ -124,6 +117,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
+  // (Função _criarAgendamento - está correta)
   Future<void> _criarAgendamento({
     required Sala sala,
     required TimeOfDay horario,
@@ -133,11 +127,9 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     required String pacienteId,
     required String alunoId,
   }) async {
-    // ... (sem alterações)
      final horaInicio = '${horario.hour.toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
     final horaFim = '${(horario.hour + 1).toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}:00';
     final data = DateFormat('yyyy-MM-dd').format(_selectedDay);
-
     try {
       await SupabaseConfig.client.from('agendamentos').insert({
         'sala_id': sala.id,
@@ -157,8 +149,8 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
+  // (Função _excluirAgendamento - está correta)
   Future<void> _excluirAgendamento(String agendamentoId) async {
-    // ... (sem alterações)
      final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -181,17 +173,17 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     }
   }
 
+  // (Função _showSnackBar - está correta)
   void _showSnackBar(String message, {bool isError = false}) {
-    // ... (sem alterações)
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: isError ? Colors.red : Colors.green),
     );
   }
 
+  // (Função build - está correta)
   @override
   Widget build(BuildContext context) {
-    // ... (sem alterações)
      return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -217,8 +209,8 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
+  // (Função _buildCalendar - está correta)
   Widget _buildCalendar() {
-    // ... (sem alterações)
     return Card(
       margin: const EdgeInsets.all(8.0),
       elevation: 2,
@@ -251,8 +243,8 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
+  // (Função _buildTimetable - está correta)
   Widget _buildTimetable() {
-    // ... (sem alterações)
     final horas = List.generate(15, (i) => 8 + i);
     return SingleChildScrollView(
       child: SingleChildScrollView(
@@ -270,8 +262,8 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
+  // (Função _buildTimeAxis - está correta)
   Widget _buildTimeAxis(List<int> horas) {
-    // ... (sem alterações)
     return Container(
       padding: const EdgeInsets.only(top: 40),
       child: Column(
@@ -288,7 +280,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  // ===== ⭐ MUDANÇA 2: Tornar o _buildRoomColumn Nulo-Seguro ⭐ =====
+  // ===== ALTERAÇÃO 1: Na chamada 'onTap' =====
   Widget _buildRoomColumn(Sala sala, List<int> horas) {
     final agendamentosDaSala = _agendamentosDoDia.where((a) => a.salaId == sala.id).toList();
 
@@ -308,8 +300,6 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
               Column(
                 children: horas.map((hora) {
                   final slotTime = TimeOfDay(hour: hora, minute: 0);
-                  
-                  // Adicionamos verificação de nulidade aqui
                   final agendamentoNesteSlot = agendamentosDaSala.any((ag) {
                      if (ag.horaInicio == null || ag.horaFim == null) return false;
                      return (hora >= ag.horaInicio!.hour && hora < ag.horaFim!.hour);
@@ -328,15 +318,11 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                 }).toList(),
               ),
               ...agendamentosDaSala.map((agendamento) {
-                // Se hora for null (devido ao parsing robusto), não desenha o card
                 if (agendamento.horaInicio == null || agendamento.horaFim == null) {
-                  return const SizedBox.shrink(); // Retorna um widget vazio
+                  return const SizedBox.shrink(); 
                 }
-
                 final double top = (agendamento.horaInicio!.hour - 8) * _horaHeight + (agendamento.horaInicio!.minute / 60.0) * _horaHeight;
                 final double height = ((agendamento.horaFim!.hour * 60 + agendamento.horaFim!.minute) - (agendamento.horaInicio!.hour * 60 + agendamento.horaInicio!.minute)) / 60.0 * _horaHeight;
-
-                // Adicionamos '?? false' para segurança
                 final bool isRecorrente = agendamento.isRecorrente ?? false;
 
                 return Positioned(
@@ -345,8 +331,13 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                   right: 4,
                   height: height > 2 ? height - 2 : height,
                   child: InkWell(
-                    // O objeto 'agendamento' agora está completo e seguro para ser passado
-                    onTap: () => _showEditDeleteDialog(agendamento), 
+                    
+                    // ===== AQUI ESTÁ A MUDANÇA 1 =====
+                    // Não passamos mais o objeto 'agendamento' inteiro.
+                    // Passamos apenas os valores primitivos (Strings).
+                    onTap: () => _showEditDeleteDialog(agendamento.id, agendamento.titulo),
+                    // ===================================
+                    
                     child: Card(
                       color: isRecorrente ? Colors.blue[400] : Colors.red[400],
                       elevation: 2,
@@ -354,8 +345,7 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
                         padding: const EdgeInsets.all(4.0),
                         child: Row(
                           children: [
-                            if (isRecorrente)
-                              const Icon(Icons.sync, color: Colors.white, size: 12),
+                            if (isRecorrente) const Icon(Icons.sync, color: Colors.white, size: 12),
                             if (isRecorrente) const SizedBox(width: 4),
                             Expanded(
                               child: Text(
@@ -377,12 +367,10 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
       ),
     );
   }
-  // =======================================================
 
 
-  /// DIÁLOGO DE CRIAR AGENDAMENTO (COM DROPDOWN DE PESQUISA)
+  // (Função _showCreateDialog - está correta, com pesquisa)
   void _showCreateDialog({required Sala sala, required TimeOfDay horario}) {
-    // ... (sem alterações)
     final titleController = TextEditingController();
     bool isRecorrente = false;
     DateTime? dataFimRecorrencia;
@@ -532,19 +520,20 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
     );
   }
 
-  /// DIÁLOGO DE OPÇÕES DE AGENDAMENTO (Corrigido para o deploy)
-  void _showEditDeleteDialog(Agendamento agendamento) {
-    // ... (sem alterações, agora deve funcionar)
+  // ===== ALTERAÇÃO 2: Na assinatura da função =====
+  void _showEditDeleteDialog(String agendamentoId, String? titulo) {
     showDialog(
       context: context,
       builder: (context) {
          return AlertDialog(
           title: const Text('Opções de Agendamento'),
+          
+          // ===== ALTERAÇÃO 3: Usando a variável 'titulo' =====
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start, 
             children: [
-              Text("Título: ${agendamento.titulo ?? 'Não informado'}", 
+              Text("Título: ${titulo ?? 'Não informado'}", 
                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 16),
               // TODO: Mostrar paciente/aluno aqui
@@ -555,7 +544,8 @@ class _AgendamentoScreenState extends State<AgendamentoScreen> {
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               onPressed: () {
                 Navigator.of(context).pop(); 
-                _excluirAgendamento(agendamento.id); 
+                // Usando a variável 'agendamentoId'
+                _excluirAgendamento(agendamentoId); 
               },
               tooltip: 'Excluir Agendamento',
             ),
