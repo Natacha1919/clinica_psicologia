@@ -1,12 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/paciente_detalhado_model.dart';
+import '../models/paciente_detalhado_model.dart'; // Modelo atualizado com totalConsultas
 import 'editar_paciente_screen.dart';
 
 // ===== Imports para o PDF =====
 import '../../../core/services/pdf_generator_service.dart';
+// Modelo para passar dados ao PDF
 import '../../../core/services/pdf_generator_service.dart' show AgendamentoPdfModel;
+
+// ===== ADIÇÃO 1: Modelo de Dados para Pagamentos =====
+// (Podemos mover para um ficheiro próprio depois, se preferir)
+class PagamentoModel {
+  final String id;
+  final DateTime dataPagamento;
+  final double valor;
+  final String formaDePagto;
+
+  PagamentoModel({
+    required this.id,
+    required this.dataPagamento,
+    required this.valor,
+    required this.formaDePagto,
+  });
+
+  factory PagamentoModel.fromJson(Map<String, dynamic> json) {
+    return PagamentoModel(
+      id: json['id'] as String,
+      dataPagamento: DateTime.parse(json['data_pagamento'] as String),
+      valor: (json['valor'] as num).toDouble(), // Converte 'num' para 'double'
+      formaDePagto: json['forma_de_pagto'] as String? ?? 'Não informada',
+    );
+  }
+}
+// ===================================================
+
 
 class DetalhesPacienteScreen extends StatefulWidget {
   final String pacienteId;
@@ -22,10 +50,13 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
   bool _isGerandoPdf = false;
   final PdfGeneratorService _pdfService = PdfGeneratorService();
 
+  // Chave para forçar a atualização da lista de pagamentos
+  int _financeiroRefreshKey = 0; 
+
   @override
   void initState() {
     super.initState();
-    _futurePaciente = _getPacienteDetalhado();
+    _futurePaciente = _getPacienteDetalhado(); // Chama a função que busca paciente + contagem
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -42,20 +73,13 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
 
   // Função que busca os detalhes E a contagem via RPC
   Future<PacienteDetalhado?> _getPacienteDetalhado() async {
-    if (widget.pacienteId.isEmpty) {
-      return null;
-    }
+    if (widget.pacienteId.isEmpty) { return null; }
     final supabase = Supabase.instance.client;
     try {
       final data = await supabase
-          .rpc(
-            'get_paciente_detalhado_com_contagem', // Nome da função SQL
-            params: {'p_paciente_id': widget.pacienteId}
-          )
+          .rpc('get_paciente_detalhado_com_contagem', params: {'p_paciente_id': widget.pacienteId})
           .single();
-
       return PacienteDetalhado.fromJson(data);
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,7 +90,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     }
   }
 
-  // Função para gerar o PDF (com busca real)
+  // Função para gerar o PDF (com busca real de agendamentos)
   Future<void> _handleGerarPdf(PacienteDetalhado paciente) async {
     setState(() => _isGerandoPdf = true);
     try {
@@ -84,7 +108,6 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
       final agendamentos = (agendamentosData as List).map((json) {
           final alunoInfo = json['alunos'] as Map<String, dynamic>?;
           final alunoNome = alunoInfo?['nome_completo'] ?? 'Aluno não informado';
-
           return AgendamentoPdfModel(
             data: DateTime.parse(json['data_agendamento']),
             horaInicio: json['hora_inicio']?.toString().substring(0, 5) ?? '--:--',
@@ -96,7 +119,6 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
         paciente: paciente,
         agendamentos: agendamentos,
       );
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -110,14 +132,23 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     }
   }
 
+  // Função de SnackBar
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        // ... (AppBar sem alterações)
-         backgroundColor: Colors.grey[50],
+        backgroundColor: Colors.grey[50],
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -177,7 +208,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                     ],
                   );
                 }
-                return const SizedBox.shrink();
+                return const SizedBox.shrink(); 
               }),
         ],
       ),
@@ -220,14 +251,13 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: IndexedStack(
+                    child: IndexedStack( 
                       index: _tabController.index,
                       children: [
-                        // Aba 0: Visão Geral (Passa o paciente com a contagem)
-                        SingleChildScrollView(child: _buildVisaoGeralTab(paciente)),
-                        _buildConsultasTab(paciente.id),
-                        _buildPlaceholderTab('Financeiro'),
-                        _buildPlaceholderTab('Notas Clínicas'),
+                        SingleChildScrollView(child: _buildVisaoGeralTab(paciente)), 
+                        _buildConsultasTab(paciente.id), 
+                        _buildFinanceiroTab(paciente.id), 
+                        _buildPlaceholderTab('Notas Clínicas'), 
                       ],
                     ),
                   ),
@@ -239,11 +269,10 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     );
   }
 
-  // ===== FUNÇÃO DA ABA VISÃO GERAL (LAYOUT AJUSTADO) =====
+  // (Função _buildVisaoGeralTab - sem alterações)
   Widget _buildVisaoGeralTab(PacienteDetalhado paciente) {
     return Column(
       children: [
-        // Cards de Informações Pessoais e Saúde (sem alteração)
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -286,41 +315,28 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
           ],
         ),
         const SizedBox(height: 24),
-
-        // --- LINHA DO CARD MÉTRICO (CENTRALIZADO) ---
         Row(
-          // 1. Centraliza o conteúdo horizontalmente
-          mainAxisAlignment: MainAxisAlignment.center, 
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 2. Usamos Flexible em vez de Expanded para permitir que o card
-            //    tenha seu tamanho natural, mas ainda limitado pela Row.
-            //    O SizedBox força uma largura mínima/máxima se necessário.
             Flexible(
-              // flex: 0, // Não precisa de flex se só há um item visível
-              child: ConstrainedBox( // Limita a largura do card
-                constraints: const BoxConstraints(maxWidth: 250), // Ajuste a largura máxima como desejar
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 250),
                 child: _buildMetricCard(
                   icon: Icons.calendar_today_outlined, 
-                  // 3. Usa a contagem real (fallback simplificado: substituir por consulta real quando disponível no modelo)
-                  value: '0', 
+                  value: paciente.totalConsultas.toString(), 
                   label: 'Total de Consultas', 
                   color: Colors.blueAccent
                 ),
               ),
             ),
-            // 4. Os outros cards foram removidos
           ],
         )
-        // --- FIM DA LINHA DO CARD MÉTRICO ---
       ],
     );
   }
-  // =======================================================
-
-
-  // --- FUNÇÃO DA ABA CONSULTAS (sem alteração) ---
+  
+  // (Função _buildConsultasTab - sem alterações)
   Widget _buildConsultasTab(String pacienteId) {
-    // ... (código completo da função _buildConsultasTab)
     final futureConsultas = Supabase.instance.client
         .from('agendamentos')
         .select('''
@@ -332,7 +348,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
           salas ( nome ) 
         ''')
         .eq('paciente_id', pacienteId)
-        .order('data_agendamento', ascending: false); // Mais recentes primeiro
+        .order('data_agendamento', ascending: false);
 
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: futureConsultas,
@@ -348,7 +364,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.calendar_today_outlined, size: 48, color: Colors.grey),
+                Icon(Icons.calendar_month_outlined, size: 48, color: Colors.grey),
                 SizedBox(height: 16),
                 Text('Nenhuma consulta encontrada para este paciente.'),
               ],
@@ -357,7 +373,6 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
         }
 
         final consultas = snapshot.data!;
-
         return ListView.builder(
           itemCount: consultas.length,
           itemBuilder: (context, index) {
@@ -399,7 +414,285 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     );
   }
 
-  // --- Funções de Widgets Auxiliares (sem alteração) ---
+  // --- FUNÇÃO DA ABA FINANCEIRO (COM EXCLUSÃO) ---
+  Widget _buildFinanceiroTab(String pacienteId) {
+    final futurePagamentos = Supabase.instance.client
+        .from('pagamentos_pacientes') // Nome correto da tabela
+        .select()
+        .eq('paciente_id', pacienteId)
+        .order('data_pagamento', ascending: false);
+    
+    final key = ValueKey('financeiro_$_financeiroRefreshKey'); 
+
+    return Column(
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Adicionar Pagamento'),
+              onPressed: () {
+                _showAddPagamentoDialog(pacienteId); // Chama o diálogo
+              },
+            ),
+          ),
+        ),
+        Expanded(
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            key: key, 
+            future: futurePagamentos,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Erro ao buscar pagamentos: ${snapshot.error}'));
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(
+                  child: Text('Nenhum pagamento registrado para este paciente.'),
+                );
+              }
+
+              final pagamentos = snapshot.data!
+                  .map((json) => PagamentoModel.fromJson(json))
+                  .toList();
+              
+              final totalPago = pagamentos.fold<double>(0.0, (sum, item) => sum + item.valor);
+
+              return Column(
+                children: [
+                  Card(
+                    elevation: 2,
+                    child: ListTile(
+                      leading: Icon(Icons.attach_money, color: Colors.green.shade700),
+                      title: const Text('Total Pago (Já Registrado)'),
+                      trailing: Text(
+                        NumberFormat.simpleCurrency(locale: 'pt_BR').format(totalPago),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 20),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: pagamentos.length,
+                      itemBuilder: (context, index) {
+                        final pag = pagamentos[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              child: Text(DateFormat('dd').format(pag.dataPagamento)),
+                            ),
+                            title: Text(
+                              NumberFormat.simpleCurrency(locale: 'pt_BR').format(pag.valor),
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              'Data: ${DateFormat('dd/MM/yyyy').format(pag.dataPagamento)}',
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Chip(
+                                  label: Text(pag.formaDePagto),
+                                  backgroundColor: Colors.grey.shade100,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                  tooltip: 'Excluir Pagamento',
+                                  onPressed: () {
+                                    _handleDeletePagamento(
+                                      pag.id, 
+                                      pag.valor, 
+                                      pag.dataPagamento
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- DIÁLOGO DE ADICIONAR PAGAMENTO ---
+  Future<void> _showAddPagamentoDialog(String pacienteId) async {
+    final formKey = GlobalKey<FormState>();
+    final valorController = TextEditingController();
+    String? selectedFormaPagto; 
+    DateTime selectedDate = DateTime.now(); 
+
+    final formasDePagamento = [
+      'Pago - Crédito',
+      'Pago - Débito',
+      'Pago - Pix Manual',
+      'Pix - Qrcode',
+      'Isento' 
+    ];
+    bool isLoading = false;
+
+    Future<void> _salvarPagamento(StateSetter setDialogState) async {
+      if (!formKey.currentState!.validate()) return;
+      setDialogState(() => isLoading = true);
+      try {
+        await Supabase.instance.client.from('pagamentos_pacientes').insert({ 
+          'paciente_id': pacienteId,
+          'valor': double.tryParse(valorController.text.replaceAll(',', '.')) ?? 0.0,
+          'forma_de_pagto': selectedFormaPagto,
+          'data_pagamento': DateFormat('yyyy-MM-dd').format(selectedDate),
+        });
+
+        if (mounted) Navigator.of(context).pop(); 
+        _showSnackBar('Pagamento salvo com sucesso!');
+        setState(() => _financeiroRefreshKey++); 
+      } catch (e) {
+        if (mounted) Navigator.of(context).pop();
+        _showSnackBar('Erro ao salvar pagamento: $e', isError: true);
+      }
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Registrar Novo Pagamento'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: valorController,
+                      decoration: const InputDecoration(labelText: 'Valor (R\$)', prefixIcon: Icon(Icons.attach_money), border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                         if (value == null || value.isEmpty) {
+                          if (selectedFormaPagto != 'Isento') {
+                            return 'Valor obrigatório';
+                          }
+                         }
+                        final parsedValue = double.tryParse((value ?? '').replaceAll(',', '.'));
+                        if (parsedValue == null) {
+                           return 'Valor inválido';
+                        }
+                        if (selectedFormaPagto != 'Isento' && parsedValue <= 0) {
+                          return 'Valor deve ser positivo';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedFormaPagto,
+                      hint: const Text('Forma de Pagamento'),
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      items: formasDePagamento.map((forma) => DropdownMenuItem(value: forma, child: Text(forma))).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedFormaPagto = value;
+                          if (value == 'Isento') { valorController.text = '0.00'; }
+                        });
+                      },
+                      validator: (value) => value == null ? 'Obrigatório' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      title: const Text('Data do Pagamento'),
+                      subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(const Duration(days: 30)),
+                        );
+                        if (pickedDate != null && pickedDate != selectedDate) {
+                          setDialogState(() => selectedDate = pickedDate);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton.icon(
+                  onPressed: isLoading ? null : () => _salvarPagamento(setDialogState),
+                  icon: isLoading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save),
+                  label: Text(isLoading ? 'Salvando...' : 'Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+
+  // --- FUNÇÃO PARA EXCLUIR PAGAMENTO ---
+  Future<void> _handleDeletePagamento(String pagamentoId, double valor, DateTime data) async {
+    final valorFormatado = NumberFormat.simpleCurrency(locale: 'pt_BR').format(valor);
+    final dataFormatada = DateFormat('dd/MM/yyyy').format(data);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Exclusão'),
+        content: Text('Tem certeza que deseja excluir o pagamento de $valorFormatado realizado em $dataFormatada?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false), 
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true), 
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await Supabase.instance.client
+            .from('pagamentos_pacientes')
+            .delete()
+            .eq('id', pagamentoId);
+        
+        _showSnackBar('Pagamento excluído com sucesso!');
+        setState(() => _financeiroRefreshKey++); 
+
+      } on PostgrestException catch (e) {
+        _showSnackBar('Erro ao excluir pagamento: ${e.message}', isError: true);
+      } catch (e) {
+        _showSnackBar('Ocorreu um erro inesperado: $e', isError: true);
+      }
+    }
+  }
+
+
+  // --- Funções de Widgets Auxiliares ---
   Widget _buildPlaceholderTab(String title) {
      return Center(
       heightFactor: 5,
@@ -408,10 +701,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
           children: [
             Icon(Icons.construction_outlined, size: 48, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
-              'Seção "$title" em construção...',
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-            ),
+            Text('Seção "$title" em construção...', style: TextStyle(fontSize: 16, color: Colors.grey[500])),
           ],
         ),
     );
@@ -459,15 +749,15 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center, // Centraliza o ícone e o texto dentro do card
+          mainAxisAlignment: MainAxisAlignment.center, 
           children: [
-            CircleAvatar(
+            CircleAvatar( 
               radius: 20,
               backgroundColor: color.withOpacity(0.1),
               child: Icon(icon, color: color),
             ),
             const SizedBox(width: 12),
-            Column(
+            Column( 
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -484,9 +774,9 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
      return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Row( 
           children: [
-            CircleAvatar(
+            CircleAvatar( 
               radius: 35,
               backgroundColor: Theme.of(context).colorScheme.primary,
               child: Text(
@@ -495,21 +785,21 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
               ),
             ),
             const SizedBox(width: 16),
-            Expanded(
+            Expanded( 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Row( 
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Flexible(
+                      Flexible( 
                         child: Text(
                           paciente.nomeCompleto,
                           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Chip(
+                      Chip( 
                         label: Text(
                           paciente.statusDetalhado?.toUpperCase() ?? 'N/A',
                           style: const TextStyle(color: Colors.white, fontSize: 12),
@@ -530,7 +820,7 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
           ],
         ),
         const SizedBox(height: 16),
-        const Divider(),
+        const Divider(), 
         const SizedBox(height: 16),
         Row(
           children: [
@@ -544,21 +834,21 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
   }
 
   Widget _buildContactInfo(IconData icon, String? text) {
-    if (text == null || text.isEmpty) return const SizedBox.shrink();
-    return Expanded(
+    if (text == null || text.isEmpty) return const SizedBox.shrink(); 
+    return Expanded( 
       child: Row(
         children: [
           Icon(icon, size: 16, color: Colors.grey[700]),
           const SizedBox(width: 8),
-          Expanded(
+          Expanded( 
             child: Text(
               text,
               style: TextStyle(fontSize: 14, color: Colors.grey[800]),
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.ellipsis, 
             ),
           ),
         ],
       ),
     );
   }
-} // Fim da classe _DetalhesPacienteScreenState
+}

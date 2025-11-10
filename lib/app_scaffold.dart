@@ -8,8 +8,9 @@ import 'features/triagem/screens/triagem_screen.dart';
 import 'features/agendamento/screens/agendamento_screen.dart';
 import 'features/pacientes/screens/lista_pacientes_screen.dart';
 
-// ===== ADIÇÃO 1: Importar a nova tela de cadastro de aluno =====
+// ===== ADIÇÃO 1: Importar as telas de Alunos e Financeiro =====
 import 'package:clinica_psicologi/features/alunos/screens/alunos_screen.dart';
+import 'package:clinica_psicologi/features/financeiro/screens/financeiro_screen.dart'; // <-- LINHA ADICIONADA
 
 class AppScaffold extends StatefulWidget {
   const AppScaffold({super.key});
@@ -133,8 +134,8 @@ class _AppScaffoldState extends State<AppScaffold> {
     // Adicionamos as novas telas se o usuário for Admin ou Coordenação
     if (_userRole == 'Coordenação' || _userRole == 'Administrador') {
       
-      // Tela de Financeiro (que você já tinha)
-      availablePages.add(const Center(child: Text('Tela de Financeiro em construção')));
+      // Tela de Financeiro (Substituído o placeholder)
+      availablePages.add(const FinanceiroScreen()); // <-- ESTA É A CORREÇÃO
       availableDestinations.add(
         const NavigationRailDestination(
           padding: EdgeInsets.zero,
@@ -144,7 +145,7 @@ class _AppScaffoldState extends State<AppScaffold> {
         ),
       );
 
-      // ===== ADIÇÃO 3: Nova tela de Cadastro de Aluno =====
+      // Tela de Cadastro de Aluno
       availablePages.add(const AlunosScreen()); // Adiciona a tela
       availableDestinations.add(
         const NavigationRailDestination(

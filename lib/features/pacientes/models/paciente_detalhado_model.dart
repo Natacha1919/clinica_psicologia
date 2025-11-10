@@ -1,6 +1,7 @@
 // lib/features/pacientes/models/paciente_detalhado_model.dart
 import 'package:flutter/foundation.dart';
 
+// (Função parseDate - sem alterações)
 DateTime? parseDate(String? dateString) {
   if (dateString == null || dateString.isEmpty) return null;
   DateTime? parsedDate = DateTime.tryParse(dateString);
@@ -27,7 +28,7 @@ class PacienteDetalhado {
   final String? statusDetalhado;
   final DateTime? dataDesligamento;
   final String? email;
-  final String? telefone;
+  final String? telefone; // Corrigido de 'contato' para 'telefone' se a coluna for 'telefone'
   final String? endereco;
   final DateTime? dataNascimento;
   final String? idade;
@@ -38,8 +39,8 @@ class PacienteDetalhado {
   final String? estadoCivil;
   final String? escolaridade;
   final String? profissao;
-  final String? tipoAtendimento; // Escolha do Paciente
-  final String? classificacaoPreceptor; // ESCOLHA DO PRECEPTOR
+  final String? tipoAtendimento; 
+  final String? classificacaoPreceptor; 
   final String? nDeInscricao;
   final String? historicoSaudeMental;
   final String? usoMedicacao;
@@ -54,6 +55,10 @@ class PacienteDetalhado {
   final String? profissaoMae;
   final String? prioridadeAtendimento;
 
+  // ===== ⭐ ADIÇÃO DO CAMPO QUE FALTAVA ⭐ =====
+  final int totalConsultas; 
+  // ===========================================
+
   bool get isAtivo => dataDesligamento == null;
 
   PacienteDetalhado({
@@ -64,7 +69,7 @@ class PacienteDetalhado {
     this.statusDetalhado,
     this.dataDesligamento,
     this.email,
-    this.telefone,
+    this.telefone, // Corrigido
     this.endereco,
     this.dataNascimento,
     this.idade,
@@ -76,7 +81,7 @@ class PacienteDetalhado {
     this.escolaridade,
     this.profissao,
     this.tipoAtendimento,
-    this.classificacaoPreceptor, // CORRIGIDO
+    this.classificacaoPreceptor, 
     this.nDeInscricao,
     this.historicoSaudeMental,
     this.usoMedicacao,
@@ -90,6 +95,9 @@ class PacienteDetalhado {
     this.escolaridadeMae,
     this.profissaoMae,
     this.prioridadeAtendimento,
+    // ===== ⭐ ADIÇÃO DO PARÂMETRO NO CONSTRUTOR ⭐ =====
+    required this.totalConsultas,
+    // ==================================================
   });
 
   factory PacienteDetalhado.fromJson(Map<String, dynamic> json) {
@@ -104,10 +112,11 @@ class PacienteDetalhado {
       statusDetalhado: json['status_detalhado'] as String?,
       dataDesligamento: parseDate(json['data_desligamento'] as String?),
       email: json['email'] as String?,
-      telefone: json['contato'] as String?,
+      // Use 'contato' ou 'telefone' dependendo do nome exato da coluna no Supabase
+      telefone: json['contato'] as String? ?? json['telefone'] as String?, 
       endereco: json['endereco'] as String?,
       dataNascimento: parseDate(json['data_nascimento'] as String?),
-      idade: json['idade'] as String?,
+      idade: json['idade'] as String?, // Se 'idade' for número no Supabase, use json['idade']?.toString()
       sexo: json['sexo'] as String?,
       genero: json['genero'] as String?,
       raca: json['raca'] as String?,
@@ -116,7 +125,7 @@ class PacienteDetalhado {
       escolaridade: json['escolaridade'] as String?,
       profissao: json['profissao'] as String?,
       tipoAtendimento: json['tipo_atendimento'] as String?,
-      classificacaoPreceptor: json['classificacao_preceptor'] as String?, // CORRIGIDO
+      classificacaoPreceptor: json['classificacao_preceptor'] as String?, 
       nDeInscricao: json['n_de_inscrição'] as String?,
       historicoSaudeMental: json['historico_saude_mental'] as String?,
       usoMedicacao: json['uso_medicacao'] as String?,
@@ -130,9 +139,16 @@ class PacienteDetalhado {
       escolaridadeMae: json['escolaridade_mae'] as String?,
       profissaoMae: json['profissao_mae'] as String?,
       prioridadeAtendimento: json['prioridade_atendimento'] as String?,
+
+      // ===== ⭐ ADIÇÃO DA LEITURA DO CAMPO NO FROMJSON ⭐ =====
+      // Lê o campo 'total_consultas' do JSON retornado pela função SQL.
+      // Tenta converter de forma segura, assumindo 0 se falhar ou for nulo.
+      totalConsultas: int.tryParse(json['total_consultas']?.toString() ?? '0') ?? 0,
+      // =======================================================
     );
   }
 
+  // (Getter 'iniciais' - sem alterações)
   String get iniciais {
     if (nomeCompleto.isEmpty) return '?';
     final parts = nomeCompleto.split(' ').where((p) => p.isNotEmpty).toList();
