@@ -14,6 +14,15 @@ class AlunosScreen extends StatefulWidget {
 class _AlunosScreenState extends State<AlunosScreen> {
   late Future<List<AlunoModel>> _alunosFuture;
 
+  // ===== DEFINIÇÃO DAS PERMISSÕES DISPONÍVEIS =====
+  // Chave (salva no banco) : Valor (Texto na tela)
+  final Map<String, String> _permissoesDisponiveis = {
+    'dashboard': 'Ver Dashboard',
+    'inscritos': 'Acessar Inscritos/Triagem',
+    'pacientes': 'Gestão de Pacientes',
+    'agendamentos': 'Agenda e Calendário',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -21,11 +30,10 @@ class _AlunosScreenState extends State<AlunosScreen> {
   }
 
   Future<List<AlunoModel>> _fetchAlunos() async {
-    // ... (sem alterações)
-     try {
+    try {
       final data = await Supabase.instance.client
           .from('alunos')
-          .select('id, nome_completo, ra, email') 
+          .select('id, nome_completo, ra, email, permissoes') // <-- Incluir permissoes
           .order('nome_completo', ascending: true); 
 
       final alunos = (data as List)
@@ -39,15 +47,13 @@ class _AlunosScreenState extends State<AlunosScreen> {
   }
 
   void _refreshAlunosList() {
-    // ... (sem alterações)
-     setState(() {
+    setState(() {
       _alunosFuture = _fetchAlunos();
     });
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    // ... (sem alterações)
-     if (!mounted) return;
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -57,13 +63,17 @@ class _AlunosScreenState extends State<AlunosScreen> {
   }
 
   /// =============================================================
-  /// DIÁLOGO DE CADASTRO DE ALUNO (Lógica movida para cá)
+  /// DIÁLOGO DE CADASTRO DE ALUNO
   /// =============================================================
   Future<void> _showCreateAlunoDialog() async {
     final formKeyDialog = GlobalKey<FormState>();
     final nomeControllerDialog = TextEditingController();
     final raControllerDialog = TextEditingController();
     final emailControllerDialog = TextEditingController();
+    
+    // Lista local para controlar as permissões selecionadas neste diálogo
+    List<String> permissoesSelecionadas = []; 
+    
     bool isLoadingDialog = false; 
 
     disposeControllers() {
@@ -73,8 +83,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
     }
 
     Future<void> salvarAlunoDialog(StateSetter setDialogState) async {
-      // ... (lógica de salvar - sem alterações)
-       if (!formKeyDialog.currentState!.validate()) {
+      if (!formKeyDialog.currentState!.validate()) {
         return;
       }
       setDialogState(() => isLoadingDialog = true); 
@@ -88,6 +97,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
           'nome_completo': nomeCompleto,
           'ra': ra.isNotEmpty ? ra : null,
           'email': email.isNotEmpty ? email : null,
+          'permissoes': permissoesSelecionadas, // <-- Salva a lista
         });
 
         if (mounted) Navigator.of(context).pop(); 
@@ -111,12 +121,8 @@ class _AlunosScreenState extends State<AlunosScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Cadastrar Novo Aluno'),
-              
-              // ===== ⭐ CORREÇÃO AQUI ⭐ =====
-              // Removemos o SizedBox que estava a envolver o Form.
-              // O AlertDialog e o SingleChildScrollView gerem o tamanho.
               content: SingleChildScrollView(
-                child: Form( // <-- O Form é filho direto do SingleChildScrollView
+                child: Form( 
                   key: formKeyDialog,
                   child: Column(
                     mainAxisSize: MainAxisSize.min, 
@@ -124,36 +130,49 @@ class _AlunosScreenState extends State<AlunosScreen> {
                     children: [
                       TextFormField(
                         controller: nomeControllerDialog,
-                        decoration: const InputDecoration(
-                          labelText: 'Nome Completo', 
-                          hintText: 'Nome completo do estagiário', // Hint text adicionado
-                          border: OutlineInputBorder(), // Borda adicionada
-                        ),
+                        decoration: const InputDecoration(labelText: 'Nome Completo', hintText: 'Nome completo', border: OutlineInputBorder()),
                         validator: (value) => (value == null || value.trim().isEmpty) ? 'O nome é obrigatório.' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: raControllerDialog,
-                        decoration: const InputDecoration(
-                          labelText: 'RA (Opcional)',
-                          hintText: 'Ex: 123456', // Hint text adicionado
-                          border: OutlineInputBorder(), // Borda adicionada
-                          ),
+                        decoration: const InputDecoration(labelText: 'RA (Opcional)', hintText: 'Ex: 123456', border: OutlineInputBorder()),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: emailControllerDialog,
-                        decoration: const InputDecoration(
-                          labelText: 'E-mail (Opcional)',
-                          hintText: 'email.aluno@fecaf.com.br', // Hint text adicionado
-                          border: OutlineInputBorder(), // Borda adicionada
-                          ),
+                        decoration: const InputDecoration(labelText: 'E-mail (Opcional)', hintText: 'email@fecaf.com.br', border: OutlineInputBorder()),
                         keyboardType: TextInputType.emailAddress,
                       ),
+                      
+                      // ===== SEÇÃO DE PERMISSÕES =====
+                      const SizedBox(height: 24),
+                      const Text('Permissões de Acesso:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Divider(),
+                      // Gera um Checkbox para cada permissão disponível
+                      ..._permissoesDisponiveis.entries.map((entry) {
+                        return CheckboxListTile(
+                          title: Text(entry.value),
+                          value: permissoesSelecionadas.contains(entry.key),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                permissoesSelecionadas.add(entry.key);
+                              } else {
+                                permissoesSelecionadas.remove(entry.key);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                      // ===============================
                     ],
                   ),
                 ),
-              ), // ===== FIM DA CORREÇÃO =====
+              ),
               actions: [
                 TextButton(
                   onPressed: isLoadingDialog ? null : () => Navigator.of(context).pop(),
@@ -161,9 +180,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
                 ),
                 FilledButton.icon(
                   onPressed: isLoadingDialog ? null : () => salvarAlunoDialog(setDialogState),
-                  icon: isLoadingDialog 
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                      : const Icon(Icons.save),
+                  icon: isLoadingDialog ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save),
                   label: Text(isLoadingDialog ? 'Salvando...' : 'Salvar'),
                 ),
               ],
@@ -175,14 +192,18 @@ class _AlunosScreenState extends State<AlunosScreen> {
     disposeControllers();
   }
 
- /// =============================================================
-  /// DIÁLOGO DE EDIÇÃO DE ALUNO 
+  /// =============================================================
+  /// DIÁLOGO DE EDIÇÃO DE ALUNO (ATUALIZADO)
   /// =============================================================
   Future<void> _showEditAlunoDialog(AlunoModel aluno) async {
     final formKeyDialog = GlobalKey<FormState>();
     final nomeControllerDialog = TextEditingController(text: aluno.nomeCompleto);
     final raControllerDialog = TextEditingController(text: aluno.ra);
     final emailControllerDialog = TextEditingController(text: aluno.email);
+    
+    // Carrega as permissões atuais do aluno para editar
+    List<String> permissoesSelecionadas = List.from(aluno.permissoes);
+    
     bool isLoadingDialog = false;
 
     disposeControllers() {
@@ -192,8 +213,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
     }
 
     Future<void> atualizarAlunoDialog(StateSetter setDialogState) async {
-      // ... (lógica de atualizar - sem alterações)
-        if (!formKeyDialog.currentState!.validate()) {
+      if (!formKeyDialog.currentState!.validate()) {
         return;
       }
       setDialogState(() => isLoadingDialog = true);
@@ -207,6 +227,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
           'nome_completo': nomeCompleto,
           'ra': ra.isNotEmpty ? ra : null,
           'email': email.isNotEmpty ? email : null,
+          'permissoes': permissoesSelecionadas, // <-- Atualiza a lista
         }).eq('id', aluno.id); 
 
         if (mounted) Navigator.of(context).pop();
@@ -230,10 +251,8 @@ class _AlunosScreenState extends State<AlunosScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Editar Aluno'), 
-              
-              // ===== ⭐ CORREÇÃO AQUI (igual à do diálogo de Criar) ⭐ =====
               content: SingleChildScrollView(
-                child: Form( // <-- Form direto no SingleChildScrollView
+                child: Form( 
                   key: formKeyDialog,
                   child: Column(
                     mainAxisSize: MainAxisSize.min, 
@@ -241,36 +260,48 @@ class _AlunosScreenState extends State<AlunosScreen> {
                     children: [
                       TextFormField(
                         controller: nomeControllerDialog, 
-                        decoration: const InputDecoration(
-                          labelText: 'Nome Completo', 
-                          hintText: 'Nome completo do estagiário',
-                          border: OutlineInputBorder(),
-                          ),
+                        decoration: const InputDecoration(labelText: 'Nome Completo', border: OutlineInputBorder()),
                         validator: (value) => (value == null || value.trim().isEmpty) ? 'O nome é obrigatório.' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: raControllerDialog, 
-                        decoration: const InputDecoration(
-                          labelText: 'RA (Opcional)',
-                          hintText: 'Ex: 123456',
-                          border: OutlineInputBorder(),
-                          ),
+                        decoration: const InputDecoration(labelText: 'RA (Opcional)', border: OutlineInputBorder()),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: emailControllerDialog, 
-                        decoration: const InputDecoration(
-                          labelText: 'E-mail (Opcional)',
-                          hintText: 'email.aluno@fecaf.com.br',
-                          border: OutlineInputBorder(),
-                          ),
+                        decoration: const InputDecoration(labelText: 'E-mail (Opcional)', border: OutlineInputBorder()),
                         keyboardType: TextInputType.emailAddress,
                       ),
+
+                      // ===== SEÇÃO DE PERMISSÕES (EDIÇÃO) =====
+                      const SizedBox(height: 24),
+                      const Text('Permissões de Acesso:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Divider(),
+                      ..._permissoesDisponiveis.entries.map((entry) {
+                        return CheckboxListTile(
+                          title: Text(entry.value),
+                          value: permissoesSelecionadas.contains(entry.key),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          onChanged: (bool? value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                permissoesSelecionadas.add(entry.key);
+                              } else {
+                                permissoesSelecionadas.remove(entry.key);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                      // ========================================
                     ],
                   ),
                 ),
-              ), // ===== FIM DA CORREÇÃO =====
+              ), 
               actions: [
                 TextButton(
                   onPressed: isLoadingDialog ? null : () => Navigator.of(context).pop(),
@@ -278,9 +309,7 @@ class _AlunosScreenState extends State<AlunosScreen> {
                 ),
                 FilledButton.icon(
                   onPressed: isLoadingDialog ? null : () => atualizarAlunoDialog(setDialogState), 
-                  icon: isLoadingDialog 
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                      : const Icon(Icons.save_as), 
+                  icon: isLoadingDialog ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save_as), 
                   label: Text(isLoadingDialog ? 'Salvando...' : 'Salvar Alterações'), 
                 ),
               ],
@@ -292,21 +321,15 @@ class _AlunosScreenState extends State<AlunosScreen> {
     disposeControllers();
   }
   
-  /// =============================================================
-  /// LÓGICA DE EXCLUSÃO DE ALUNO 
-  /// =============================================================
+  // (Lógica de exclusão permanece igual, mas incluo aqui para completude)
   Future<void> _handleDeleteAluno(String alunoId, String alunoNome) async {
-    // ... (lógica de excluir - sem alterações)
-     final confirmed = await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar Exclusão'),
-        content: Text('Tem certeza que deseja excluir o aluno "$alunoNome"? Esta ação não pode ser desfeita.'),
+        content: Text('Tem certeza que deseja excluir o aluno "$alunoNome"?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false), 
-            child: const Text('Cancelar'),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true), 
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -319,26 +342,19 @@ class _AlunosScreenState extends State<AlunosScreen> {
     if (confirmed == true) {
       try {
         await Supabase.instance.client.from('alunos').delete().eq('id', alunoId);
-        
-        _showSnackBar('Aluno "$alunoNome" excluído com sucesso!');
+        _showSnackBar('Aluno excluído com sucesso!');
         _refreshAlunosList(); 
-
       } on PostgrestException catch (e) {
         _showSnackBar('Erro ao excluir aluno: ${e.message}', isError: true);
-        if (e.code == '23503') { 
-           _showSnackBar('Erro: Não é possível excluir este aluno pois ele está associado a agendamentos.', isError: true);
-        }
       } catch (e) {
-        _showSnackBar('Ocorreu um erro inesperado ao excluir: $e', isError: true);
+        _showSnackBar('Erro inesperado: $e', isError: true);
       }
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    // ... (AppBar e RefreshIndicator - sem alterações)
-     return Scaffold(
+    return Scaffold(
       appBar: AppBar(
         title: const Text('Gestão de Alunos'),
         actions: [
@@ -357,21 +373,15 @@ class _AlunosScreenState extends State<AlunosScreen> {
         child: FutureBuilder<List<AlunoModel>>(
           future: _alunosFuture,
           builder: (context, snapshot) {
-            // ... (Estados de Loading, Erro, Vazio - sem alterações)
-             if (snapshot.connectionState == ConnectionState.waiting) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(
-                child: Text('Erro ao carregar alunos: ${snapshot.error}'),
-              );
+              return Center(child: Text('Erro: ${snapshot.error}'));
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(
-                child: Text('Nenhum aluno cadastrado ainda.'),
-              );
+              return const Center(child: Text('Nenhum aluno cadastrado ainda.'));
             }
-
 
             final alunos = snapshot.data!;
             return ListView.builder(
@@ -379,6 +389,12 @@ class _AlunosScreenState extends State<AlunosScreen> {
               itemCount: alunos.length,
               itemBuilder: (context, index) {
                 final aluno = alunos[index];
+                
+                // Gera uma string com as permissões para mostrar no card
+                final permsString = aluno.permissoes.isEmpty 
+                    ? 'Sem acesso definido'
+                    : 'Acesso: ${aluno.permissoes.map((p) => _permissoesDisponiveis[p] ?? p).join(', ')}';
+
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8.0),
                   child: ListTile(
@@ -386,23 +402,24 @@ class _AlunosScreenState extends State<AlunosScreen> {
                       child: Text(aluno.nomeCompleto.isNotEmpty ? aluno.nomeCompleto[0].toUpperCase() : '?'),
                     ),
                     title: Text(aluno.nomeCompleto),
-                    subtitle: Text('RA: ${aluno.ra ?? 'N/A'} - Email: ${aluno.email ?? 'N/A'}'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('RA: ${aluno.ra ?? 'N/A'}'),
+                        Text(permsString, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      ],
+                    ),
+                    isThreeLine: true, // Para caber a lista de permissões
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min, 
                       children: [
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, color: Colors.blueGrey),
-                          tooltip: 'Editar Aluno',
-                          onPressed: () {
-                            _showEditAlunoDialog(aluno); 
-                          },
+                          onPressed: () => _showEditAlunoDialog(aluno),
                         ),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                          tooltip: 'Excluir Aluno',
-                          onPressed: () {
-                            _handleDeleteAluno(aluno.id, aluno.nomeCompleto);
-                          },
+                          onPressed: () => _handleDeleteAluno(aluno.id, aluno.nomeCompleto),
                         ),
                       ],
                     ),

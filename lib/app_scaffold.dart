@@ -8,9 +8,8 @@ import 'features/triagem/screens/triagem_screen.dart';
 import 'features/agendamento/screens/agendamento_screen.dart';
 import 'features/pacientes/screens/lista_pacientes_screen.dart';
 
-// ===== ADIÇÃO 1: Importar as telas de Alunos e Financeiro =====
 import 'package:clinica_psicologi/features/alunos/screens/alunos_screen.dart';
-import 'package:clinica_psicologi/features/financeiro/screens/financeiro_screen.dart'; // <-- LINHA ADICIONADA
+import 'package:clinica_psicologi/features/financeiro/screens/financeiro_screen.dart';
 
 class AppScaffold extends StatefulWidget {
   const AppScaffold({super.key});
@@ -22,67 +21,82 @@ class AppScaffold extends StatefulWidget {
 class _AppScaffoldState extends State<AppScaffold> {
   int _selectedIndex = 0;
 
-  // Variáveis de estado para guardar as informações do perfil
-  bool _isProfileLoading = true;
+  bool _isLoading = true;
   String _userRole = 'Usuário';
   String _fullName = '';
+  
+  // ===== NOVA VARIÁVEL: Lista de permissões do aluno =====
+  List<String> _alunoPermissoes = []; 
+  bool _isAluno = false;
+  // =======================================================
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile(); // Chama a função para buscar o perfil ao iniciar a tela
+    _loadUserProfileAndPermissions(); 
   }
 
-  // Nova função para buscar os dados na tabela 'profiles'
-  Future<void> _loadUserProfile() async {
+  // ===== FUNÇÃO DE CARREGAMENTO ATUALIZADA =====
+  Future<void> _loadUserProfileAndPermissions() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      if (mounted) setState(() => _isProfileLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       return;
     }
 
     try {
-      final data = await Supabase.instance.client
+      // 1. Busca o perfil básico (Role e Nome)
+      final profileData = await Supabase.instance.client
           .from('profiles')
           .select('role, full_name')
           .eq('id', user.id)
-          .single();
+          .maybeSingle(); // maybeSingle evita erro se não existir perfil
+
+      // 2. Busca se o email existe na tabela de ALUNOS para pegar permissões
+      final alunoData = await Supabase.instance.client
+          .from('alunos')
+          .select('permissoes')
+          .eq('email', user.email!) // Liga pelo email
+          .maybeSingle();
 
       if (mounted) {
         setState(() {
-          _userRole = data['role'] ?? 'Usuário';
-          _fullName = data['full_name'] ?? '';
-          _isProfileLoading = false;
+          // Configuração do Perfil
+          if (profileData != null) {
+            _userRole = profileData['role'] ?? 'Usuário';
+            _fullName = profileData['full_name'] ?? '';
+          }
+          
+          // Configuração de Aluno
+          if (alunoData != null) {
+            _isAluno = true;
+            // Converte a lista do JSON para List<String>
+            _alunoPermissoes = List<String>.from(alunoData['permissoes'] ?? []);
+          } else {
+            _isAluno = false;
+            _alunoPermissoes = [];
+          }
+          
+          _isLoading = false;
         });
       }
     } catch (e) {
-      print('Erro ao buscar perfil do usuário: $e');
-      if (mounted) {
-        setState(() {
-          // Mantém os valores padrão em caso de erro
-          _isProfileLoading = false;
-        });
-      }
+      print('Erro ao carregar perfil/permissões: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+  // =============================================
 
   Future<void> _signOut() async {
     try {
       await Supabase.instance.client.auth.signOut();
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Erro ao sair: ${e.message}'),
-              backgroundColor: Colors.red),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao sair: ${e.message}'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const SplashScreen()),
-          (route) => false,
-        );
+        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (context) => const SplashScreen()), (route) => false);
       }
     }
   }
@@ -96,70 +110,66 @@ class _AppScaffoldState extends State<AppScaffold> {
         ? _fullName[0].toUpperCase() 
         : (userEmail.isNotEmpty ? userEmail[0].toUpperCase() : '?');
 
-    // --- LÓGICA DE PERMISSÃO ---
-    final List<Widget> availablePages = [
-      const DashboardMetricsScreen(),
-      const TriagemScreen(), // Tela de "Inscritos"
-      const ListaPacientesScreen(),
-      const AgendamentoScreen(),
-    ];
-    final List<NavigationRailDestination> availableDestinations = [
-      const NavigationRailDestination(
-        padding: EdgeInsets.zero,
-        icon: Icon(Icons.dashboard_outlined),
-        selectedIcon: Icon(Icons.dashboard),
-        label: Text('Dashboard'),
-      ),
-      const NavigationRailDestination(
-        padding: EdgeInsets.zero,
-        icon: Icon(Icons.inbox_outlined),
-        selectedIcon: Icon(Icons.inbox),
-        label: Text('Inscritos'),
-      ),
-      const NavigationRailDestination(
-        padding: EdgeInsets.zero,
-        icon: Icon(Icons.people_outline),
-        selectedIcon: Icon(Icons.people),
-        label: Text('Pacientes'),
-      ),
-      const NavigationRailDestination(
-        padding: EdgeInsets.zero,
-        icon: Icon(Icons.calendar_month_outlined),
-        selectedIcon: Icon(Icons.calendar_month),
-        label: Text('Agendamentos'),
-      ),
-    ];
+    // --- LÓGICA DE PERMISSÃO DINÂMICA ---
+    
+    // Listas base vazias, vamos preencher conforme a permissão
+    final List<Widget> finalPages = [];
+    final List<NavigationRailDestination> finalDestinations = [];
 
-    // ===== ADIÇÃO 2: Lógica de permissão para Alunos e Financeiro =====
-    // Adicionamos as novas telas se o usuário for Admin ou Coordenação
-    if (_userRole == 'Coordenação' || _userRole == 'Administrador') {
-      
-      // Tela de Financeiro (Substituído o placeholder)
-      availablePages.add(const FinanceiroScreen()); // <-- ESTA É A CORREÇÃO
-      availableDestinations.add(
-        const NavigationRailDestination(
-          padding: EdgeInsets.zero,
-          icon: Icon(Icons.attach_money_outlined),
-          selectedIcon: Icon(Icons.attach_money),
-          label: Text('Financeiro'),
-        ),
-      );
+    // Função auxiliar para adicionar páginas
+    void addPage(String key, Widget page, IconData icon, String label) {
+      finalPages.add(page);
+      finalDestinations.add(NavigationRailDestination(
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, size: 24), // Ícone normal
+        selectedIcon: Icon(icon, size: 28), // Ícone selecionado um pouco maior
+        label: Text(label),
+      ));
+    }
 
-      // Tela de Cadastro de Aluno
-      availablePages.add(const AlunosScreen()); // Adiciona a tela
-      availableDestinations.add(
-        const NavigationRailDestination(
-          padding: EdgeInsets.zero,
-          icon: Icon(Icons.school_outlined), // Ícone para "Alunos"
-          selectedIcon: Icon(Icons.school),
-          label: Text('Alunos'), // Texto do menu
-        ),
-      );
-      // =======================================================
+    // 1. Verifica se é ADMIN ou COORDENAÇÃO (Vê tudo)
+    bool isAdmin = _userRole == 'Coordenação' || _userRole == 'Administrador';
+
+    // 2. Lógica para montar o menu
+    
+    // DASHBOARD
+    if (isAdmin || _alunoPermissoes.contains('dashboard')) {
+      addPage('dashboard', const DashboardMetricsScreen(), Icons.dashboard_outlined, 'Dashboard');
+    }
+
+    // INSCRITOS (Triagem)
+    if (isAdmin || _alunoPermissoes.contains('inscritos')) {
+      addPage('inscritos', const TriagemScreen(), Icons.inbox_outlined, 'Inscritos');
+    }
+
+    // PACIENTES
+    if (isAdmin || _alunoPermissoes.contains('pacientes')) {
+      addPage('pacientes', const ListaPacientesScreen(), Icons.people_outline, 'Pacientes');
+    }
+
+    // AGENDAMENTOS
+    if (isAdmin || _alunoPermissoes.contains('agendamentos')) {
+      addPage('agendamentos', const AgendamentoScreen(), Icons.calendar_month_outlined, 'Agendamentos');
+    }
+
+    // FINANCEIRO (Apenas Admin)
+    if (isAdmin) {
+      addPage('financeiro', const FinanceiroScreen(), Icons.attach_money_outlined, 'Financeiro');
+    }
+
+    // ALUNOS (Apenas Admin)
+    if (isAdmin) {
+      addPage('alunos', const AlunosScreen(), Icons.school_outlined, 'Alunos');
+    }
+
+    // Se não tiver permissão para nada (ex: aluno novo sem checkbox marcado)
+    if (finalPages.isEmpty) {
+      finalPages.add(const Center(child: Text("Sem permissões de acesso. Contate a coordenação.")));
+      finalDestinations.add(const NavigationRailDestination(icon: Icon(Icons.lock), label: Text("Bloqueado")));
     }
     
-    // Garantia para não quebrar o índice caso o usuário mude
-    if (_selectedIndex >= availablePages.length) {
+    // Garante índice válido
+    if (_selectedIndex >= finalPages.length) {
       _selectedIndex = 0;
     }
 
@@ -191,7 +201,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                   const SizedBox(height: 20),
                 ],
               ),
-              destinations: availableDestinations, // <- A lista já está atualizada
+              destinations: finalDestinations,
               trailing: Expanded(
                 child: Align(
                   alignment: Alignment.bottomCenter,
@@ -210,7 +220,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                           ),
                           const SizedBox(width: 12),
                           Flexible(
-                            child: _isProfileLoading
+                            child: _isLoading
                                 ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
                                 : Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,9 +243,8 @@ class _AppScaffoldState extends State<AppScaffold> {
             ),
           ),
           const VerticalDivider(thickness: 1, width: 1),
-          // O corpo da tela agora é dinâmico, baseado na lista
           Expanded(
-            child: availablePages[_selectedIndex],
+            child: finalPages[_selectedIndex],
           ),
         ],
       ),

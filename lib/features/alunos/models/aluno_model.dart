@@ -3,32 +3,43 @@
 class AlunoModel {
   final String id;
   final String nomeCompleto;
-  final String? ra; // RA (Registro Acadêmico) é opcional
-  final String? email; // E-mail também é opcional
+  final String? ra;
+  final String? email;
+  // ===== NOVA PROPRIEDADE =====
+  final List<String> permissoes; 
+  // ============================
 
   AlunoModel({
     required this.id,
     required this.nomeCompleto,
     this.ra,
     this.email,
+    // ===== NOVA PROPRIEDADE =====
+    required this.permissoes,
+    // ============================
   });
 
-  // Factory para criar o modelo a partir do JSON do Supabase
   factory AlunoModel.fromJson(Map<String, dynamic> json) {
     return AlunoModel(
       id: json['id'] as String,
       nomeCompleto: json['nome_completo'] as String,
       ra: json['ra'] as String?,
       email: json['email'] as String?,
+      // ===== LER A LISTA DO JSON =====
+      // Se vier nulo, cria lista vazia. Se vier lista, converte para String.
+      permissoes: json['permissoes'] != null 
+          ? List<String>.from(json['permissoes']) 
+          : [],
+      // ===============================
     );
   }
 
-  // Método para converter o modelo para JSON (para enviar ao Supabase)
   Map<String, dynamic> toJson() {
     return {
       'nome_completo': nomeCompleto,
       'ra': ra,
       'email': email,
+      'permissoes': permissoes, // Envia a lista para o banco
     };
   }
 }

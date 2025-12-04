@@ -6,10 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/screens/splash_screen.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+// ===== ADIÇÃO 1: Importar o SessionGuard =====
+import 'core/widgets/session_guard.dart'; 
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('pt_BR', null);
 
   await Supabase.initialize(
     url: 'https://nwjrdmnlkdlfcgtvcsux.supabase.co', // Mantenha seu URL atual
@@ -17,7 +20,7 @@ Future<void> main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53anJkbW5sa2RsZmNndHZjc3V4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNTQxNDgsImV4cCI6MjA3NjYzMDE0OH0.eQa1p9YtSlvR9AXw-ZJgaE9xHROy1qJY9IWaPvZgUJU', // Mantenha sua Anon Key atual
   );
 
-  runApp(const MyApp());
+runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -26,10 +29,60 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Clínica Escola Psicologia',
-      theme: AppTheme.lightTheme, // Mantém o seu tema claro
-      debugShowCheckedModeBanner: false,
-      home: const SplashScreen(), // O SplashScreen lida com o redirecionamento
+      title: 'Clínica Escola de Psicologia',
+      debugShowCheckedModeBanner: false, 
+      
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF003366), 
+          primary: const Color(0xFF003366),
+          secondary: const Color(0xFF00A28D), 
+        ),
+        useMaterial3: true,
+        fontFamily: 'Roboto', 
+      ),
+
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('pt', 'BR'), 
+      ],
+
+      home: const AuthGate(),
+    );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        final session = snapshot.data?.session;
+
+        if (session != null) {
+          // ===== ADIÇÃO 2: Envolver o AppScaffold com o SessionGuard =====
+          // O usuário está logado. Ativamos o cronômetro.
+          return SessionGuard(
+            // Define o tempo limite (Ex: 15 minutos)
+            timeoutDuration: const Duration(minutes: 15), 
+            child: const AppScaffold(),
+          );
+          // ===============================================================
+        } else {
+          return const LoginScreen();
+        }
+      },
     );
   }
 }
