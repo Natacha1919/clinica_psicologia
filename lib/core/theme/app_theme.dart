@@ -3,17 +3,18 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // ALTERADO: Nova cor primária inspirada na imagem de referência
-  static const Color primary = Color.fromARGB(255, 10, 23, 36); 
-  static const Color secondary = Color(0xFF36D97D);
-  static const Color background = Color(0xFFF8F9FA);
-  // NOVO: Cor para o fundo do item selecionado no menu
-  static const Color accentBlue = Color(0xFF334E68);
+  // Cores da Paleta
+  static const Color primary = Color(0xFF003366); // Azul Escuro Profundo
+  static const Color secondary = Color(0xFF36D97D); // Verde Água Vibrante
+  static const Color background = Color(0xFFF8F9FA); // Cinza Claro (Fundo)
+  static const Color accentBlue = Color(0xFF334E68); // Azul Acinzentado (Item Selecionado)
 
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
+    fontFamily: 'Roboto', // Garante que a fonte Roboto seja usada em todo o app
     scaffoldBackgroundColor: background,
     
+    // Esquema de Cores
     colorScheme: ColorScheme.fromSeed(
       seedColor: primary,
       primary: primary,
@@ -22,34 +23,53 @@ class AppTheme {
       brightness: Brightness.light,
     ),
 
+    // Tema da AppBar
     appBarTheme: const AppBarTheme(
-      backgroundColor: primary,
-      foregroundColor: Colors.white,
-      elevation: 0, // AppBar sem sombra para um look mais clean
+      backgroundColor: background, // Deixa a AppBar da mesma cor do fundo da tela (clean)
+      foregroundColor: primary, // Ícones e Texto em Azul Escuro
+      elevation: 0,
+      iconTheme: IconThemeData(color: primary),
     ),
 
+    // Tema dos Cards
     cardTheme: CardThemeData(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), // Bordas um pouco menos arredondadas
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),
 
+    // Tema dos Botões (FilledButton)
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: secondary,
-        foregroundColor: Colors.white,
+        backgroundColor: secondary, // Botões Verdes
+        foregroundColor: Colors.white, // Texto Branco
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: const TextStyle(fontWeight: FontWeight.bold),
       ),
     ),
     
-    // ALTERADO: Tema do NavigationRail atualizado
+    // Tema do NavigationRail (Menu Lateral)
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: primary,
-      indicatorColor: accentBlue, // Cor de fundo do item selecionado
+      backgroundColor: primary, // Fundo Azul Escuro
+      
+      // Indicador de seleção (bolinha atrás do ícone)
+      indicatorColor: accentBlue, 
       indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      
+      // Ícones
       selectedIconTheme: const IconThemeData(color: Colors.white),
       unselectedIconTheme: IconThemeData(color: Colors.white.withOpacity(0.7)),
-      selectedLabelTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-      unselectedLabelTextStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+      
+      // Textos
+      selectedLabelTextStyle: const TextStyle(
+        color: Colors.white, 
+        fontWeight: FontWeight.bold,
+        fontFamily: 'Roboto'
+      ),
+      unselectedLabelTextStyle: TextStyle(
+        color: Colors.white.withOpacity(0.7),
+        fontFamily: 'Roboto'
+      ),
     ),
   );
 }

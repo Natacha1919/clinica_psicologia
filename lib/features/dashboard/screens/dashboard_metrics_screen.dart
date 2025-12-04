@@ -52,19 +52,32 @@ class _DashboardMetricsScreenState extends State<DashboardMetricsScreen> {
     await _dashboardService.refreshData();
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
+    // Cor Azul Escura (que você pediu)
+    const primaryDark = Color(0xFF003366); 
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF8F9FA), // Fundo da tela continua claro
       appBar: AppBar(
+        // ===== MUDANÇA AQUI: FUNDO AZUL =====
+        backgroundColor: primaryDark, 
+        elevation: 0,
+        
+        // Ícones em Branco (para contrastar com o azul)
+        iconTheme: const IconThemeData(color: Colors.white),
+        
         title: const Row(children: [
-          Icon(Icons.bar_chart),
+          Icon(Icons.bar_chart, color: Colors.white), // Ícone Branco
           SizedBox(width: 10),
-          Text('Dashboard de Métricas'),
+          Text(
+            'Dashboard de Métricas',
+            style: TextStyle(
+              color: Colors.white, // Texto Branco
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ]),
-        backgroundColor: _primaryDark,
-        foregroundColor: Colors.white,
-        elevation: 2,
       ),
       body: StreamBuilder<DashboardMetrics>(
         stream: _metricsStream,

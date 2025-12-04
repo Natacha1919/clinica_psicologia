@@ -11,6 +11,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 // ===== ADIÇÃO 1: Importar o SessionGuard =====
 import 'core/widgets/session_guard.dart'; 
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -30,17 +31,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Clínica Escola de Psicologia',
-      debugShowCheckedModeBanner: false, 
+      debugShowCheckedModeBanner: false,
       
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF003366), 
-          primary: const Color(0xFF003366),
-          secondary: const Color(0xFF00A28D), 
-        ),
-        useMaterial3: true,
-        fontFamily: 'Roboto', 
-      ),
+      // ===== AQUI ESTÁ A MUDANÇA =====
+      // Em vez de definir o tema aqui, usamos a classe AppTheme
+      theme: AppTheme.lightTheme, 
+      // ===============================
 
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -71,14 +67,10 @@ class AuthGate extends StatelessWidget {
         final session = snapshot.data?.session;
 
         if (session != null) {
-          // ===== ADIÇÃO 2: Envolver o AppScaffold com o SessionGuard =====
-          // O usuário está logado. Ativamos o cronômetro.
           return SessionGuard(
-            // Define o tempo limite (Ex: 15 minutos)
             timeoutDuration: const Duration(minutes: 15), 
             child: const AppScaffold(),
           );
-          // ===============================================================
         } else {
           return const LoginScreen();
         }
