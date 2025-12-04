@@ -189,17 +189,22 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> {
     // ... (Lógica para gerar PDF, se necessário)
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Detalhes do Paciente'),
-        foregroundColor: Colors.white,
-        elevation: 2,
+        backgroundColor: const Color(0xFFF8F9FA),
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: primaryColor),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text('Detalhes do Paciente', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined),
+            icon: Icon(Icons.picture_as_pdf_outlined, color: primaryColor),
             tooltip: 'Gerar PDF',
             onPressed: _generatePdf,
           ),
@@ -214,7 +219,6 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> {
           if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
             return const Center(child: Text('Não foi possível carregar os dados do paciente.'));
           }
-
           final paciente = _pacienteAtual!;
           final bool isModoTriagem = _statusAtual == StatusPaciente.triagemRealizada;
 

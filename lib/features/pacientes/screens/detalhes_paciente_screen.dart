@@ -143,22 +143,32 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
     );
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
+    // Pegamos a cor primária (azul) para usar nos elementos da AppBar
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.grey[50],
         elevation: 0,
+        
+        // ===== MUDANÇA 2: Ícone de Voltar AZUL =====
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: Icon(Icons.arrow_back, color: primaryColor), // Azul
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Column(
+        
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Perfil do Paciente', style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
-            Text('Informações completas e histórico', style: TextStyle(color: Colors.black54, fontSize: 12)),
+            // ===== MUDANÇA 2: Título AZUL =====
+            Text(
+              'Perfil do Paciente', 
+              style: TextStyle(color: primaryColor, fontSize: 18, fontWeight: FontWeight.bold)
+            ),
+            const Text('Informações completas e histórico', style: TextStyle(color: Colors.black54, fontSize: 12)),
           ],
         ),
         actions: [
@@ -170,12 +180,12 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                   return Row(
                     children: [
                       _isGerandoPdf
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 14.0),
-                              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black87, strokeWidth: 2))),
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: primaryColor, strokeWidth: 2))),
                             )
                           : IconButton(
-                              icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.black87),
+                              icon: Icon(Icons.picture_as_pdf_outlined, color: primaryColor),
                               tooltip: 'Gerar Prontuário PDF',
                               onPressed: () => _handleGerarPdf(paciente),
                             ),
@@ -235,9 +245,10 @@ class _DetalhesPacienteScreenState extends State<DetalhesPacienteScreen> with Si
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: TabBar(
                     controller: _tabController,
-                    labelColor: Theme.of(context).colorScheme.primary,
+                    // Cores das abas também em azul para combinar
+                    labelColor: primaryColor,
                     unselectedLabelColor: Colors.grey[600],
-                    indicatorColor: Theme.of(context).colorScheme.primary,
+                    indicatorColor: primaryColor,
                     isScrollable: true,
                     tabs: const [
                       Tab(text: 'Visão Geral'),
